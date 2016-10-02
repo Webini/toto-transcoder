@@ -1,0 +1,17 @@
+{
+  "name": "toto-transcoder",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/transcoder.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "yolo": "node test/handyTest.js"
+  },
+  "author": "GASPARINI Nicolas",
+  "license": "ISC",
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.0",
+    "restify": "^4.1.1",
+    "winston": "^2.2.0"
+  }
+}

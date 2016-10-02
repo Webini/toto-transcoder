@@ -1,0 +1,46 @@
+{
+    "preferredLang": "^fr.*",
+    "debug": true,
+    "presets": [
+        {
+            "default": true,
+            "name": "480p",
+            "vcodec": "libx264",
+            "vbitrate": 516096,
+            "maxbitrate": 516096,
+            "acodec": "libfaac",
+            "abitrate": 98304,
+            "channel": 2,
+            "threads": 4,
+            "width": 720,
+            "height": 480,
+            "preset": "slow"
+        },
+        {
+            "name": "720p",
+            "vcodec": "libx264",
+            "vbitrate": 890880,
+            "maxbitrate": 890880,
+            "acodec": "libfaac",
+            "abitrate": 131072,
+            "channel": 2,
+            "threads": 4,
+            "width": 1280,
+            "height": 720,
+            "preset": "slow"
+        },
+        {
+            "name": "1080p",
+            "vcodec": "libx264",
+            "vbitrate": 1884160,
+            "maxbitrate": 1884160,
+            "acodec": "libfaac",
+            "abitrate": 163840,
+            "channel": 2,
+            "threads": 4,
+            "width": 1920, 
+            "height": 1080,
+            "preset": "slow"
+        }
+    ]
+}
