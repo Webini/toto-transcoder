@@ -63,7 +63,7 @@ describe('Media', () => {
 
 
   describe('#selectVideoTrack', () => {
-    const metadata = require('./resources/metadata-video.json');
+    const metadata = require('./resources/metadata-video-low.json');
 
     it('Should not be able to found a video track', () => {
       const media = new Media({});
@@ -81,7 +81,6 @@ describe('Media', () => {
   });
 
   describe('#selectPresets', () => {
-    const metadata      = require('./resources/metadata-video.json');
     const presets       = require('./resources/presets-video.json');
     const defaultPreset = presets.reduce((prec, cur) => {
       if (prec && prec.default) {
@@ -102,11 +101,41 @@ describe('Media', () => {
       assert.throws(() => media.selectPresets());
     }); 
 
-    it('Should fallback to default preset', () => {
-      const media = new Media({ metadata });
+    it('Should fallback to default preset and preserve av bitrate and size', () => {
+      const metadata = require('./resources/metadata-video-low.json');
+      const media    = new Media({ metadata });
 
-      selectAll(media, {}, defaultPreset);
+      selectAll(media, [], defaultPreset);
+
+      assert.strictEqual(media.qualities.length, 1, 'It should not have more than one quality selected');
       
+      assert.deepStrictEqual(
+        media.qualities[0], 
+        Object.assign({}, defaultPreset, {
+          width:    metadata.streams[0].width,
+          height:   metadata.streams[0].height,
+          abitrate: metadata.streams[1].bit_rate,
+          vbitrate: metadata.streams[0].bit_rate
+        })
+      );
+    });
+
+    it('Should select first preset, arrange width and use original audio bitrate', () => {
+      const metadata       = require('./resources/metadata-video-480.json');
+      const media          = new Media({ metadata });
+      const expectedPreset = presets[0];
+      
+      selectAll(media, presets, defaultPreset);
+
+      assert.strictEqual(media.qualities.length, 1, 'It should not be more than one quality selected');
+      
+      assert.deepStrictEqual(
+        media.qualities[0], 
+        Object.assign({}, expectedPreset, {
+          width:    640,
+          abitrate: metadata.streams[1].bit_rate,
+        })
+      );
     });
   });
 });

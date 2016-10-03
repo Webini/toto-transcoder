@@ -1,5 +1,5 @@
 const assert      = require('assert');
-const forcedRegex = /force/ig; //to find forced subtitles 
+const forcedRegex = /force/i; //to find forced subtitles 
 
 /**
  * Find all tracks for a given codec and a specific regex
@@ -40,8 +40,6 @@ function findTracks(codecType, streams, regex){
  * @return {Object}
  */
 function isSubtitleForced(subtitle){
-  forcedRegex.lastIndex = 0; //reset regex
-
   return ((subtitle.disposition && subtitle.disposition.forced) || 
           (subtitle.tags.NUMBER_OF_FRAMES && subtitle.tags.NUMBER_OF_FRAMES <= 50) ||  //mkvmerge provided data, we try to guess forced subtitle here
           forcedRegex.test(subtitle.tags.title));
@@ -62,7 +60,7 @@ function getOriginalOrDefaultBitrate(originalValue, defaultValue){
 };
 
 /**
- * @todo Use the default flag in stram[X].disposition to improve track selection
+ * @todo Use the "default" field in stram[X].disposition to improve track selection
  */
 class Media {
   /**
@@ -152,8 +150,9 @@ class Media {
    * @return {Media}
    */
   selectPresets(presets, defaultPreset) {
-    const video = this.map.video;
-    const audio = this.map.audio;
+    const video     = this.map.video;
+    const audio     = this.map.audio;
+    const qualities = [];
 
     assert.ok(!!video, 'selectVideoTrack must be called before selectPresets');
     assert.ok(!!audio, 'selectAudioAndSubTrack must be called before selectPresets');
@@ -162,25 +161,30 @@ class Media {
       const cHeight = preset.height;
       const cWidth  = preset.width;
       const oQal    = Object.assign({}, preset);
+      let pusheable = false;
       
       if(video.height >= cHeight){
         oQal.width = Math.round(video.width / video.height * oQal.height); //auto width
         oQal.width += oQal.width % 2; //must be divisible by 2
+        pusheable = true;
       }
       else if(video.width >= cWidth){
         oQal.height = Math.round(video.height / video.width * oQal.width); //auto height
         oQal.height += oQal.height % 2; //must be divisible by 2
+        pusheable = true;
       }
 
-      oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
-      oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);
-      qualities.push(oQal);
+      if (pusheable) {
+        oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
+        oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);
+        qualities.push(oQal);
+      }
     });
 
     
     //if no qualities are found we'll use the default quality with options adapted to the current media
     if(qualities.length <= 0){
-      const oQal = _.clone(defaultQuality);
+      const oQal = Object.assign({}, defaultPreset);
       
       oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
       oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);

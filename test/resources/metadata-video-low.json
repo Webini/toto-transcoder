@@ -1,0 +1,21 @@
+{
+	"streams": [
+		{
+			"index": 0,
+			"codec_type": "video",
+			"width": 400,
+			"height": 360,
+			"bit_rate": 420000
+		},
+		{
+			"index": 1,
+			"codec_type": "audio",
+			"bit_rate": 96000,
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "und",
+				"handler_name": "GPAC ISO Audio Handler"
+			}
+		}
+  ]
+}
