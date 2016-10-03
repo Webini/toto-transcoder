@@ -1,0 +1,85 @@
+{
+	"streams": [
+		{
+			"index": 1,
+			"codec_type": "audio",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "und",
+				"handler_name": "GPAC ISO Audio Handler"
+			}
+		},
+		{
+			"index": 2,
+			"codec_type": "audio",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "english",
+				"handler_name": "GPAC ISO Audio Handler"
+			}
+		},
+		{
+			"index": 3,
+			"codec_type": "audio",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "french",
+				"handler_name": "GPAC ISO Audio Handler"
+			}
+		},
+		{
+			"index": 4,
+			"codec_type": "subtitle",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "french",
+        "title": "Français forced"
+			}
+		},
+		{
+			"index": 5,
+			"codec_type": "subtitle",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "french",
+        "title": "Français"
+			}
+		},
+		{
+			"index": 6,
+			"codec_type": "subtitle",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "english",
+        "title": "English forced"
+			}
+		},
+		{
+			"index": 7,
+			"codec_type": "subtitle",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "english",
+        "title": "English"
+			}
+		},
+		{
+			"index": 8,
+			"codec_type": "subtitle",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "russian",
+        "title": "Russian forced"
+			}
+		},
+		{
+			"index": 9,
+			"codec_type": "subtitle",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:42",
+				"language": "russian",
+        "title": "Russian"
+			}
+		}
+	]
+}

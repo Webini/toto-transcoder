@@ -13,5 +13,8 @@
     "fluent-ffmpeg": "^2.1.0",
     "restify": "^4.1.1",
     "winston": "^2.2.0"
+  },
+  "devDependencies": {
+    "lodash": "^4.16.3"
   }
 }

@@ -1,0 +1,62 @@
+{
+	"streams": [
+		{
+			"index": 0,
+			"codec_name": "h264",
+			"codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+			"profile": "High",
+			"codec_type": "video",
+			"codec_time_base": "1/60",
+			"codec_tag_string": "avc1",
+			"codec_tag": "0x31637661",
+			"width": 1920,
+			"height": 1080,
+			"has_b_frames": 2,
+			"sample_aspect_ratio": "1:1",
+			"display_aspect_ratio": "16:9",
+			"pix_fmt": "yuv420p",
+			"level": 41,
+			"color_range": "N/A",
+			"color_space": "unknown",
+			"color_transfer": "unknown",
+			"color_primaries": "unknown",
+			"chroma_location": "left",
+			"timecode": "N/A",
+			"refs": 4,
+			"is_avc": 1,
+			"nal_length_size": 4,
+			"id": "N/A",
+			"r_frame_rate": "30/1",
+			"avg_frame_rate": "30/1",
+			"time_base": "1/30000",
+			"start_pts": 2000,
+			"start_time": 0.066667,
+			"duration_ts": 19036000,
+			"duration": 634.533333,
+			"bit_rate": 2998715,
+			"max_bit_rate": "N/A",
+			"bits_per_raw_sample": 8,
+			"nb_frames": 19036,
+			"nb_read_frames": "N/A",
+			"nb_read_packets": "N/A",
+			"tags": {
+				"creation_time": "2013-12-16 17:44:39",
+				"language": "und",
+				"handler_name": "GPAC ISO Video Handler"
+			},
+			"disposition": {
+				"default": 1,
+				"dub": 0,
+				"original": 0,
+				"comment": 0,
+				"lyrics": 0,
+				"karaoke": 0,
+				"forced": 0,
+				"hearing_impaired": 0,
+				"visual_impaired": 0,
+				"clean_effects": 0,
+				"attached_pic": 0
+			}
+		}
+  ]
+}

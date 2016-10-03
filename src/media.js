@@ -1,3 +1,4 @@
+const assert      = require('assert');
 const forcedRegex = /force/ig; //to find forced subtitles 
 
 /**
@@ -16,10 +17,14 @@ function findTracks(codecType, streams, regex){
         out.push(streams[key]);
       }
       else if(streams[key].tags){
+        regex.lastIndex = 0;
         if(regex.test(streams[key].tags.language)){
           out.push(streams[key]);
+          continue;
         }
-        else if(regex.test(streams[key].tags.title)){
+
+        regex.lastIndex = 0;
+        if(regex.test(streams[key].tags.title)){
           out.push(streams[key]);
         }
       }
@@ -35,8 +40,10 @@ function findTracks(codecType, streams, regex){
  * @return {Object}
  */
 function isSubtitleForced(subtitle){
-  return (subtitle.disposition.forced || 
-          subtitle.tags.NUMBER_OF_FRAMES && subtitle.tags.NUMBER_OF_FRAMES <= 50 ||  //mkvmerge provided data, we try to guess forced subtitle here
+  forcedRegex.lastIndex = 0; //reset regex
+
+  return ((subtitle.disposition && subtitle.disposition.forced) || 
+          (subtitle.tags.NUMBER_OF_FRAMES && subtitle.tags.NUMBER_OF_FRAMES <= 50) ||  //mkvmerge provided data, we try to guess forced subtitle here
           forcedRegex.test(subtitle.tags.title));
 };
 
@@ -54,6 +61,9 @@ function getOriginalOrDefaultBitrate(originalValue, defaultValue){
   return defaultValue;
 };
 
+/**
+ * @todo Use the default flag in stram[X].disposition to improve track selection
+ */
 class Media {
   /**
    * Constructor
@@ -77,64 +87,76 @@ class Media {
    * @param {RegExp} preferredLanguage Regex to find preferred language
    * @return {Media}
    */
-  configureAudioSubTracks(preferredLanguage) {
+  selectAudioAndSubTrack(preferredLanguage) {
     const allAudioTracks = findTracks('audio', this.metadata.streams);
 
-    if (allAudioTracks.length <= 0) {
-      throw new Error('Cannot found any audio track');
-    }
+    assert.ok(allAudioTracks.length > 0, 'Cannot found any audio track');
 
     const audioTracks = findTracks('audio', allAudioTracks, preferredLanguage);
     const subTracks   = findTracks('subtitle', this.metadata.streams, preferredLanguage);
 
     //audio found
     if(audioTracks.length > 0){
-        this.map.audio = audioTracks[0];
-        
-        //if requested audio is found, and if we have subtitles we try to incrust forced subtitle  
-        for(let i = 0; i < subTracks.length; i++){
-            if(isSubtitleForced(subTracks[i])){
-                this.map.subtitle = subTracks[i];
-                break;
-            }
+      this.map.audio = audioTracks[0];
+      
+      //if requested audio is found, and if we have subtitles we try to incrust forced subtitle  
+      for(let i = 0, sz = subTracks.length; i < sz; i++){
+        if(isSubtitleForced(subTracks[i])){
+          this.map.subtitle = subTracks[i];
+          break;
         }
+      }
     } 
     else if(subTracks.length > 0){ //audio with the needed language not found, we are going to incrust full subtitles
-        for(let i = 0; i < subTracks.length; i++){
-            if(!isSubtitleForced(subTracks[i])){
-                this.map.subtitle = subTracks[i];
-                break;
-            }
+      for(let i = 0, sz = subTracks.length; i < sz; i++){
+        if(!isSubtitleForced(subTracks[i])){
+          this.map.subtitle = subTracks[i];
+          break;
         }
-        
-        //if full subtitles weren't found, fallback with forced one
-        if(!this.map.subtitle){
-            this.map.subtitle = subTracks[0];
-        }
+      }
+      
+      //if full subtitles weren't found, fallback with forced one
+      if(!this.map.subtitle){
+        this.map.subtitle = subTracks[0];
+      }
     }
     
     //if no audio selected, we use the first track
     if(!this.map.audio){
-        this.map.audio = allAudioTracks[0];
+      this.map.audio = allAudioTracks[0];
     }
     
     return this;
   }
 
   /**
+   * Select video track
    * @return {Media}
    */
-  configureVideoTracks(presets, defaultPreset) {
+  selectVideoTrack(presets, defaultPreset) {
     const qualities = [];
     const streams   = findTracks('video', this.metadata.streams);
     
-    if(streams.length <= 0){
-      throw new Error('Cannot found any video track');
-    }
+    assert.ok(streams.length > 0, 'Cannot found any video track');
     
     //select first video track by default
-    const video = streams[0];
-    this.map.video = video;
+    this.map.video = streams[0];
+
+    return this;
+  }
+
+  /**
+   * Select qualities presets for transco
+   * @param {Array[Object]} presets
+   * @param {Object} defaultPreset
+   * @return {Media}
+   */
+  selectPresets(presets, defaultPreset) {
+    const video = this.map.video;
+    const audio = this.map.audio;
+
+    assert.ok(!!video, 'selectVideoTrack must be called before selectPresets');
+    assert.ok(!!audio, 'selectAudioAndSubTrack must be called before selectPresets');
     
     presets.forEach((preset, i) => {
       const cHeight = preset.height;
@@ -151,7 +173,7 @@ class Media {
       }
 
       oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
-      oQal.abitrate = getOriginalOrDefaultBitrate(this.map.audio.bit_rate, oQal.abitrate);
+      oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);
       qualities.push(oQal);
     });
 
@@ -161,9 +183,9 @@ class Media {
       const oQal = _.clone(defaultQuality);
       
       oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
-      oQal.abitrate = getOriginalOrDefaultBitrate(this.map.audio.bit_rate, oQal.abitrate);
-      oQal.width = video.width;
-      oQal.height = video.height;
+      oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);
+      oQal.width    = video.width;
+      oQal.height   = video.height;
       qualities.push(oQal);
     }
     

@@ -1,5 +1,6 @@
 const Media  = require('./media.js');
 const FFmpeg = require('fluent-ffmpeg');
+const fs     = require('fs');
 
 class Transcoder {
   constructor({ presets, debug, preferredLang = '^fr.*' }) {
@@ -7,7 +8,7 @@ class Transcoder {
     this.debug         = debug || process.env.toLowerCase().split(' ').includes('toto-transcoder'); 
     this.presets       = presets;
     this.defaultPreset = null;
-    
+
     this.presets.forEach((preset) => {
       if (preset.default) {
         this.defaultPreset = preset;
@@ -30,16 +31,21 @@ class Transcoder {
     return new Promise((resolve, reject) => {
       const media = new Media({ file: inputFile, subtitle: subtitleFile });
 
+      if (media.subtitle) {
+        fs.accessSync(media.customSubtitle);
+      }
+
       FFmpeg.ffprobe(media.file, (err, metadata) => {
         if(err !== null){
-          reject(err);
-        }    
+          return reject(err);
+        }
         
         media.metadata = metadata;
         
         resolve(
-          media.configureAudioSubTracks(this.preferredLang)
-               .configureVideoTracks(this.presets, this.defaultPreset)
+          media.selectAudioAndSubTrack(this.preferredLang)
+               .selectVideoTrack(this.presets, this.defaultPreset)
+               .selectPresets(this.presets, this.defaultPreset)
         );
       });
     });
