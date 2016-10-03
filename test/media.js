@@ -127,7 +127,7 @@ describe('Media', () => {
       
       selectAll(media, presets, defaultPreset);
 
-      assert.strictEqual(media.qualities.length, 1, 'It should not be more than one quality selected');
+      assert.strictEqual(media.qualities.length, 1, 'It should not have more than one quality selected');
       
       assert.deepStrictEqual(
         media.qualities[0], 

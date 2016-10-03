@@ -1,3 +1,6 @@
 .vscode
 node_modules
 garbage/
+!.gitkeep
+test/tmp/*
+test/ffmpeg-*

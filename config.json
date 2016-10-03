@@ -14,7 +14,8 @@
             "threads": 4,
             "width": 720,
             "height": 480,
-            "preset": "slow"
+            "preset": "slow",
+            "format": "mp4"
         },
         {
             "name": "720p",
@@ -27,7 +28,8 @@
             "threads": 4,
             "width": 1280,
             "height": 720,
-            "preset": "slow"
+            "preset": "slow",
+            "format": "mp4"
         },
         {
             "name": "1080p",
@@ -40,7 +42,8 @@
             "threads": 4,
             "width": 1920, 
             "height": 1080,
-            "preset": "slow"
+            "preset": "slow",
+            "format": "mp4"
         }
     ]
 }
