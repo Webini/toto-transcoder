@@ -1,5 +1,6 @@
 const assert      = require('assert');
 const forcedRegex = /force/i; //to find forced subtitles 
+const _           = require('lodash');
 
 /**
  * Find all tracks for a given codec and a specific regex
@@ -73,19 +74,20 @@ class Media {
     this.file           = file;
     this.metadata       = metadata;
     this.customSubtitle = subtitle;
-    this.map            = {
-      audio:    null,
+    this.best           = {
+      audio: null,
       subtitle: null,
-      video:    null
+      video: null
     };
-    this.qualities      = null;
+
+    this.outputs        = null;
   }
 
   /**
    * @param {RegExp} preferredLanguage Regex to find preferred language
    * @return {Media}
    */
-  selectAudioAndSubTrack(preferredLanguage) {
+  selectBestAV(preferredLanguage) {
     const allAudioTracks = findTracks('audio', this.metadata.streams);
 
     assert.ok(allAudioTracks.length > 0, 'Cannot found any audio track');
@@ -95,12 +97,12 @@ class Media {
 
     //audio found
     if(audioTracks.length > 0){
-      this.map.audio = audioTracks[0];
+      this.best.audio = audioTracks[0];
       
       //if requested audio is found, and if we have subtitles we try to incrust forced subtitle  
       for(let i = 0, sz = subTracks.length; i < sz; i++){
         if(isSubtitleForced(subTracks[i])){
-          this.map.subtitle = subTracks[i];
+          this.best.subtitle = subTracks[i];
           break;
         }
       }
@@ -108,20 +110,20 @@ class Media {
     else if(subTracks.length > 0){ //audio with the needed language not found, we are going to incrust full subtitles
       for(let i = 0, sz = subTracks.length; i < sz; i++){
         if(!isSubtitleForced(subTracks[i])){
-          this.map.subtitle = subTracks[i];
+          this.best.subtitle = subTracks[i];
           break;
         }
       }
       
       //if full subtitles weren't found, fallback with forced one
-      if(!this.map.subtitle){
-        this.map.subtitle = subTracks[0];
+      if(!this.best.subtitle){
+        this.best.subtitle = subTracks[0];
       }
     }
     
     //if no audio selected, we use the first track
-    if(!this.map.audio){
-      this.map.audio = allAudioTracks[0];
+    if(!this.best.audio){
+      this.best.audio = allAudioTracks[0];
     }
     
     return this;
@@ -131,14 +133,14 @@ class Media {
    * Select video track
    * @return {Media}
    */
-  selectVideoTrack(presets, defaultPreset) {
+  selectVideoTrack() {
     const qualities = [];
     const streams   = findTracks('video', this.metadata.streams);
     
     assert.ok(streams.length > 0, 'Cannot found any video track');
     
     //select first video track by default
-    this.map.video = streams[0];
+    this.best.video = streams[0];
 
     return this;
   }
@@ -150,50 +152,56 @@ class Media {
    * @return {Media}
    */
   selectPresets(presets, defaultPreset) {
-    const video     = this.map.video;
-    const audio     = this.map.audio;
-    const qualities = [];
-
-    assert.ok(!!video, 'selectVideoTrack must be called before selectPresets');
-    assert.ok(!!audio, 'selectAudioAndSubTrack must be called before selectPresets');
+    assert.ok(!!this.best.video, 'selectVideoTrack must be called before selectPresets');
+    assert.ok(!!this.best.audio, 'selectAudioAndSubTrack must be called before selectPresets');
     
+    const audio           = this.best.audio;
+    const video           = this.best.video;
+    const outputs         = [];
+    const audioTracks     = findTracks('audio', this.metadata.streams);
+    const subtitlesTracks = findTracks('subtitle', this.metadata.streams);
+    
+    const baseConf = {
+      audio:    { tracks: audioTracks },
+      subtitle: { tracks: subtitlesTracks },
+      video:    { track: this.best.video }
+    };
+
     presets.forEach((preset, i) => {
-      const cHeight = preset.height;
-      const cWidth  = preset.width;
-      const oQal    = Object.assign({}, preset);
-      let pusheable = false;
+      const conf = _.merge({}, preset, baseConf);
       
-      if(video.height >= cHeight){
-        oQal.width = Math.round(video.width / video.height * oQal.height); //auto width
-        oQal.width += oQal.width % 2; //must be divisible by 2
-        pusheable = true;
+      if(video.height >= conf.video.height){
+        conf.video.width = Math.round(video.width / video.height * conf.video.height); //auto width
+        conf.video.width += conf.video.width % 2; //must be divisible by 2
       }
-      else if(video.width >= cWidth){
-        oQal.height = Math.round(video.height / video.width * oQal.width); //auto height
-        oQal.height += oQal.height % 2; //must be divisible by 2
-        pusheable = true;
+      else if(video.width >= conf.video.width){
+        conf.video.height = Math.round(video.height / video.width * conf.video.width); //auto height
+        conf.video.height += conf.video.height % 2; //must be divisible by 2
+      }
+      else {
+        return;
       }
 
-      if (pusheable) {
-        oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
-        oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);
-        qualities.push(oQal);
-      }
+      conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
+      conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
+
+      outputs.push(conf);
     });
 
     
-    //if no qualities are found we'll use the default quality with options adapted to the current media
-    if(qualities.length <= 0){
-      const oQal = Object.assign({}, defaultPreset);
+    //if no presets are found we'll use the default preset with options adapted to the current media
+    if(outputs.length <= 0){
+      const conf = _.merge({}, defaultPreset, baseConf);
       
-      oQal.vbitrate = getOriginalOrDefaultBitrate(video.bit_rate, oQal.vbitrate);
-      oQal.abitrate = getOriginalOrDefaultBitrate(audio.bit_rate, oQal.abitrate);
-      oQal.width    = video.width;
-      oQal.height   = video.height;
-      qualities.push(oQal);
+      conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
+      conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
+      conf.video.width   = video.width;
+      conf.video.height  = video.height;
+
+      outputs.push(conf);
     }
     
-    this.qualities = qualities;
+    this.outputs = outputs;
     
     return this;
   }

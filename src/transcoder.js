@@ -2,7 +2,33 @@ const Media  = require('./media.js');
 const FFmpeg = require('fluent-ffmpeg');
 const fs     = require('fs');
 const path   = require('path');
+/*
+const requiredConfKeys = [
+  "name", 
+  "vcodec", 
+  "vbitrate", 
+  "maxbitrate", 
+  "acodec", 
+  "abitrate", 
+  "channel", 
+  "width", 
+  "height", 
+  "format"
+];*/
 
+/**
+ * @param {Object} preset
+ 
+function assertPreset(preset) {
+  const presetKeys = Object.keys(preset);
+
+  requiredConfKeys.forEach((key) => {
+    if (!presetKeys.contains(key)) {
+      throw new Error(`The configuration element ${key} is missing for preset ${preset.name}`);
+    }
+  });
+}
+*/
 /**
  * @param {String} file File path
  * @param {Function|null} progressCallback Progression Callback
@@ -46,6 +72,7 @@ class Transcoder {
       if (preset.default) {
         this.defaultPreset = preset;
       }
+      //assertPreset(preset);
     });
 
     if (this.defaultPreset === null) {
@@ -69,14 +96,14 @@ class Transcoder {
       }
 
       FFmpeg.ffprobe(media.file, (err, metadata) => {
-        if(err !== null){
+        if(err){
           return reject(err);
         }
         
         media.metadata = metadata;
         
         resolve(
-          media.selectAudioAndSubTrack(this.preferredLang)
+          media.selectBestAV(this.preferredLang)
                .selectVideoTrack(this.presets, this.defaultPreset)
                .selectPresets(this.presets, this.defaultPreset)
         );
@@ -100,69 +127,85 @@ class Transcoder {
       const filters = [];
 
       media
-        .qualities
+        .outputs
         .sort((first, second) => { //we need to desc order for complex filters 
           return (second.vbitrate + second.abitrate) - (first.vbitrate + first.abitrate);
         })
-        .forEach((quality, i, qualities) => {
-          console.log('DOING => ', quality.name);
-          const file          = path.join(outputDirectory, `${filePrefix}.${quality.name}.${quality.format}`);
-          const output        = ffo.output(file);
-          const options       = [];
-          const filterOutName = quality.name;
-          const prevFilterName = (i > 0 ? qualities[i-1].name : null);
+        .forEach((conf, i, outputs) => {
+          const file           = path.join(outputDirectory, `${filePrefix}.${conf.name}.${conf.format}`);
+          const output         = ffo.output(file);
+          const options        = [];
+          const filterOutName  = conf.name;
+          const prevFilterName = (i > 0 ? outputs[i-1].name : null);
 
-          files[quality.name] = file;
+          files[conf.name] = file;
 
           //trying to remove file if exists
           try {
               fs.unlinkSync(outFile);
           } catch(e) { }
 
-          filters.push({ 
-            filter: 'scale', 
-            inputs: (!prevFilterName ? ('0:' + media.map.video.index) : prevFilterName),
-            options: quality.width + ':' + quality.height,
-            outputs: filterOutName
-          });
-          /**
-           * @todo créer le premier filtre a partir du plus grand preset & incruster les ST, 
-           * puis split les encoders en qualities.length avec quality.name qui fournira un 
-           * output ${quality.name}.out
-           */
+          filters.push(
+            `[${(!prevFilterName ? ('0:' + conf.video.track.index) : prevFilterName)}]` +
+            `scale=${conf.video.width}:${conf.video.height},` + 
+            'split=' + (i + 1 < outputs.length ? `2[${filterOutName}]` : '1') + `[${filterOutName}tofile]`
+          );
+          
+            options.push('-t 30');
 
           options.push(
-            '-maxrate ' + quality.maxbitrate,
-            '-bufsize ' + (quality.maxbitrate * 4),
-            '-map 0:'   + media.map.audio.index
+            '-maxrate ' + conf.video.maxbitrate,
+            '-bufsize ' + (conf.video.maxbitrate * 4)
           );
 
-          if (quality.threads) {
-            options.push('-threads ' + quality.threads);
+          if (conf.threads) {
+            options.push('-threads ' + conf.threads);
           }
 
-          if(quality.preset){
-            options.push('-preset ' + quality.preset);
+          if(conf.preset){
+            options.push('-preset ' + conf.preset);
           }
 
+          //on va mapper l'audio
+          conf.audio.tracks.forEach((track) => {
+            options.push(`-map 0:${track.index}`);
+            if (track.index === media.best.audio.index) {
+              options.push(`-disposition:0:${track.index} default`);
+            }
+          });
+
+          //subtitles
+          options.push('-scodec mov_text');
+          
+          conf.subtitle.tracks.forEach((track) => {
+            if (track.codec_name.toLowerCase() !== 'dvdsub') {
+              options.push(`-map 0:${track.index}`);
+
+              if (track.index === media.best.subtitle.index) {
+                options.push(`-disposition:0:${track.index} default`);
+              }
+            }
+          });
           /**
            * @todo incrust subtitles 
            */
 
-          options.push(`-map [${filterOutName}]`);
-
-          output.audioCodec(quality.acodec)
-                .audioBitrate(quality.abitrate)
-                .audioChannels(quality.channel)
-                .videoCodec(quality.vcodec)
-                .videoBitrate(quality.vbitrate)
+          options.push(`-map [${filterOutName}tofile]`);
+          //options.push('-map 0:' + conf.video.track.index);
+          
+          output.audioCodec(conf.audio.codec)
+                .audioBitrate(conf.audio.bitrate)
+                .audioChannels(conf.audio.channels)
+                .videoCodec(conf.video.codec)
+                .videoBitrate(conf.video.bitrate)
                 .outputOptions(options)
-                .format(quality.format);
+                .format(conf.format);
         });
 
       ffo.complexFilter(filters);
 
       ffo.on('error', (error, stdout, stderr) => {
+        console.log('ERROR CATCHED', error);
         reject(stderr || error || stdout);
       });
 

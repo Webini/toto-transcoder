@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "fluent-ffmpeg": "^2.1.0",
+    "lodash": "^4.16.3",
     "restify": "^4.1.1",
     "winston": "^2.2.0"
   },

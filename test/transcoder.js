@@ -5,7 +5,8 @@ const path       = require('path');
 describe('Transcoder', () => {
   const outputDir  = path.join(__dirname, 'tmp');
   const filePrefix = 'test';
-  const mediaFile1 = path.join(__dirname, 'resources/bbb-625-10.mp4');
+  const media1     = path.join(__dirname, './resources/bbb-625-10.mp4');
+  const mediaFile1 = '/media/Films/Films HD/John Rambo (2008) BR Rip x264 1080p VF MA VO MA 7.1- HDZ.mkv';//path.join(__dirname, 'resources/bbb-625-10.mp4');
   const presets    = require('./resources/presets-video.json');
   const transco    = new Transcoder({ presets });
 
@@ -17,7 +18,7 @@ describe('Transcoder', () => {
         .catch((err) => done());
     });
 
-    it('Can\'t open media file', () => {
+    it('Can\'t open media file', (done) => {
       transco
         .prepare('notfound')
         .then(() => done(new Error('It should not found file')))
@@ -28,12 +29,12 @@ describe('Transcoder', () => {
       transco
         .prepare(media1)
         .then(() => done())
-        .then((err) => done(err));
+        .catch((err) => done(err));
     });
 
-    it.only('Can make basic transcoding with progression', function(done) {
+    it('Can make basic transcoding with progression', function(done) {
       let   progressSeen = false;
-      this.timeout(15000);
+      this.timeout(555000);
 
       transco
         .prepare(mediaFile1)

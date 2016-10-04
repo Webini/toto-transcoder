@@ -8,7 +8,7 @@ describe('Media', () => {
   const ruLanguage = /^ru.*/i;
   const czLanguage = /^cz.*/i;
 
-  describe('#selectAudioAndSubTrack', () => {
+  describe('#selectBestAV', () => {
     const metadata = require('./resources/metadata-audio-subtitles.json');
 
     it('Should not be able to found an audio track', () => {
@@ -21,10 +21,10 @@ describe('Media', () => {
       const audioNeeded     = metadata.streams[1];
       const subtitleNeeded  = metadata.streams[5];
 
-      media.selectAudioAndSubTrack(enLanguage);
+      media.selectBestAV(enLanguage);
 
-      assert.deepStrictEqual(media.map.audio, audioNeeded);
-      assert.deepStrictEqual(media.map.subtitle, subtitleNeeded);
+      assert.deepStrictEqual(media.best.audio, audioNeeded);
+      assert.deepStrictEqual(media.best.subtitle, subtitleNeeded);
     });
 
     it('Should select first audio track and preferred subtitles', () => {
@@ -32,10 +32,10 @@ describe('Media', () => {
       const audioNeeded     = metadata.streams[0];
       const subtitleNeeded  = metadata.streams[8];
 
-      media.selectAudioAndSubTrack(ruLanguage);
+      media.selectBestAV(ruLanguage);
 
-      assert.deepStrictEqual(media.map.audio, audioNeeded);
-      assert.deepStrictEqual(media.map.subtitle, subtitleNeeded);
+      assert.deepStrictEqual(media.best.audio, audioNeeded);
+      assert.deepStrictEqual(media.best.subtitle, subtitleNeeded);
     });
 
     it('Should select first audio track and fallback to forced subtitles', () => {
@@ -45,19 +45,19 @@ describe('Media', () => {
       const audioNeeded     = metadataCpy.streams[0];
       const subtitleNeeded  = metadataCpy.streams[7];
       
-      media.selectAudioAndSubTrack(ruLanguage);
+      media.selectBestAV(ruLanguage);
 
-      assert.deepStrictEqual(media.map.audio, audioNeeded);
-      assert.deepStrictEqual(media.map.subtitle, subtitleNeeded);
+      assert.deepStrictEqual(media.best.audio, audioNeeded);
+      assert.deepStrictEqual(media.best.subtitle, subtitleNeeded);
     });
 
     it('No preferred subtitle & audio tracks, fallback to first audio track', () => {
       const media           = new Media({ metadata });
       const audioNeeded     = metadata.streams[0];
 
-      media.selectAudioAndSubTrack(czLanguage);
+      media.selectBestAV(czLanguage);
 
-      assert.deepStrictEqual(media.map.audio, audioNeeded);
+      assert.deepStrictEqual(media.best.audio, audioNeeded);
     });
   });
 
@@ -76,7 +76,7 @@ describe('Media', () => {
       
       media.selectVideoTrack();
       
-      assert.deepStrictEqual(media.map.video, videoNeeded);
+      assert.deepStrictEqual(media.best.video, videoNeeded);
     }); 
   });
 
@@ -91,9 +91,16 @@ describe('Media', () => {
     });
 
     function selectAll(media, presets, defaultPreset) {
-      media.selectAudioAndSubTrack(enLanguage)
+      media.selectBestAV(enLanguage)
            .selectVideoTrack()
            .selectPresets(presets, defaultPreset);
+    }
+
+    function cleanResult(result) {
+      delete result.subtitle;
+      delete result.audio.tracks;
+      delete result.video.track;
+      return result;
     }
 
     it('Should not be callable before selectVideoTrack and selectAudioAndSubTrack', () => {
@@ -107,15 +114,19 @@ describe('Media', () => {
 
       selectAll(media, [], defaultPreset);
 
-      assert.strictEqual(media.qualities.length, 1, 'It should not have more than one quality selected');
+      assert.strictEqual(media.outputs.length, 1, 'It should not have more than one quality selected');
       
       assert.deepStrictEqual(
-        media.qualities[0], 
-        Object.assign({}, defaultPreset, {
-          width:    metadata.streams[0].width,
-          height:   metadata.streams[0].height,
-          abitrate: metadata.streams[1].bit_rate,
-          vbitrate: metadata.streams[0].bit_rate
+        cleanResult(media.outputs[0]), 
+        _.merge({}, defaultPreset, {
+          video: {
+            width:   metadata.streams[0].width,
+            height:  metadata.streams[0].height,
+            bitrate: metadata.streams[0].bit_rate
+          },
+          audio: {
+            bitrate: metadata.streams[1].bit_rate,
+          }
         })
       );
     });
@@ -127,13 +138,17 @@ describe('Media', () => {
       
       selectAll(media, presets, defaultPreset);
 
-      assert.strictEqual(media.qualities.length, 1, 'It should not have more than one quality selected');
+      assert.strictEqual(media.outputs.length, 1, 'It should not have more than one quality selected');
       
       assert.deepStrictEqual(
-        media.qualities[0], 
-        Object.assign({}, expectedPreset, {
-          width:    640,
-          abitrate: metadata.streams[1].bit_rate,
+        cleanResult(media.outputs[0]), 
+        _.merge({}, expectedPreset, {
+          video: {
+            width:    640,
+          },
+          audio: {
+            bitrate: metadata.streams[1].bit_rate,
+          }
         })
       );
     });
