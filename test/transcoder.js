@@ -8,7 +8,12 @@ describe('Transcoder', () => {
   const filePrefix = 'test';
   const mediaFile1 = path.join(__dirname, 'resources/bbb-625-10.mp4');
   const presets    = require('./resources/presets-video.json');
-  const transco    = new Transcoder({ presets });
+  const thumbnails = {
+    "delay": "1",
+    "width": "120"
+  };
+
+  const transco    = new Transcoder({ presets, thumbnails });
 
   describe('#prepare', () => {
     it('Can\'t open subtitles', (done) => {
@@ -34,7 +39,9 @@ describe('Transcoder', () => {
 
     it('Can make basic transcoding with progression', function(done) {
       let progressSeen = false;
-      const expectedResult = {};
+      const expectedResult = {
+        thumbnails: path.join(outputDir, `${filePrefix}.thumbs.jpg`)
+      };
       this.timeout(60000);
 
       presets.forEach((preset) => {

@@ -1,6 +1,10 @@
 {
     "preferredLang": "^fr.*",
     "debug": true,
+    "thumbnails": {
+        "delay": "1/60",
+        "width": "120"
+    },
     "presets": [
         {
             "default": true,

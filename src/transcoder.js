@@ -2,6 +2,7 @@ const Media  = require('./media.js');
 const FFmpeg = require('fluent-ffmpeg');
 const fs     = require('fs');
 const path   = require('path');
+const mkdir  = require('mkdirp');
 
 const imageSubtitleCodecs = [ 'dvdsub', 'dvbsub', 'vobsub' ]; 
 
@@ -44,10 +45,11 @@ function toKb(bits) {
 }
 
 class Transcoder {
-  constructor({ presets, debug, preferredLang = '^fr.*' }) {
+  constructor({ presets, thumbnails = null, debug, preferredLang = '^fr.*' }) {
     this.preferredLang = new RegExp(preferredLang, 'i');
     this.debug         = debug || (process.env.NODE_DEBUG || '').toLowerCase().split(' ').includes('toto-transcoder'); 
     this.presets       = presets;
+    this.thumbnails    = thumbnails;
     this.defaultPreset = null;
 
     this.presets.forEach((preset) => {
@@ -191,6 +193,29 @@ class Transcoder {
                 .outputOptions(options)
                 .format(conf.format);
         });
+
+      if (this.thumbnails) {
+        const directory = path.join(outputDirectory, 'thumbs');
+        const file      = path.join(directory, `${filePrefix}.%03d.jpg`);
+        const finalFile = path.join(outputDirectory, `${filePrefix}.thumbs.jpg`);
+        const output    = ffo.output(file);
+        
+        try {
+          mkdir.sync(directory);
+
+          filters.push(
+            `[${mainVideoStream}]` +
+            `fps=${this.thumbnails.delay},` + 
+            `scale=${this.thumbnails.width || -1}:${this.thumbnails.height || -1}` +
+            `[thumbs]` 
+          );
+
+          output.outputOptions([ '-map [thumbs]' ]);
+        } catch(e) {}
+
+        //@todo imagemagick op after transco
+        files.thumbnails = finalFile;
+      }
 
       ffo.complexFilter(filters);
 
