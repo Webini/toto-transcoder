@@ -144,7 +144,7 @@ describe('Media', () => {
         cleanResult(media.outputs[0]), 
         _.merge({}, expectedPreset, {
           video: {
-            width:    640,
+            width: 640,
           },
           audio: {
             bitrate: metadata.streams[1].bit_rate,

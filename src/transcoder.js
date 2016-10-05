@@ -2,39 +2,15 @@ const Media  = require('./media.js');
 const FFmpeg = require('fluent-ffmpeg');
 const fs     = require('fs');
 const path   = require('path');
-/*
-const requiredConfKeys = [
-  "name", 
-  "vcodec", 
-  "vbitrate", 
-  "maxbitrate", 
-  "acodec", 
-  "abitrate", 
-  "channel", 
-  "width", 
-  "height", 
-  "format"
-];*/
 
-/**
- * @param {Object} preset
- 
-function assertPreset(preset) {
-  const presetKeys = Object.keys(preset);
+const imageSubtitleCodecs = [ 'dvdsub', 'dvbsub', 'vobsub' ]; 
 
-  requiredConfKeys.forEach((key) => {
-    if (!presetKeys.contains(key)) {
-      throw new Error(`The configuration element ${key} is missing for preset ${preset.name}`);
-    }
-  });
-}
-*/
 /**
  * @param {String} file File path
  * @param {Function|null} progressCallback Progression Callback
  * @return {FFmpeg} FFmpeg object 
  */
-function prepareFFmpegObject(file, progressCallback) {
+function prepareFFmpegObject(file, progressCallback, debug) {
   const ffo = FFmpeg(file);
 
   const killFFmpeg = function() {
@@ -51,14 +27,20 @@ function prepareFFmpegObject(file, progressCallback) {
     ffo.on('progress', progressCallback);
   }
   
-  ffo.on('start', (commandLine) => {
-    console.log('Spawned Ffmpeg with command: ' + commandLine);
-  });
+  if (debug) {
+    ffo.on('start', (commandLine) => {
+      console.log('Spawned Ffmpeg with command: ' + commandLine);
+    });
+  }
 
   ffo.on('end', removeListener);
   ffo.on('error', removeListener);
 
   return ffo;
+}
+
+function toKb(bits) {
+  return parseInt(bits / 1024).toString() + 'k';
 }
 
 class Transcoder {
@@ -72,7 +54,6 @@ class Transcoder {
       if (preset.default) {
         this.defaultPreset = preset;
       }
-      //assertPreset(preset);
     });
 
     if (this.defaultPreset === null) {
@@ -122,9 +103,25 @@ class Transcoder {
    */
   transcode(media, outputDirectory, filePrefix, progressCallback) {
     return new Promise((resolve, reject) => {
-      const ffo     = prepareFFmpegObject(media.file, progressCallback);
-      const files   = {};
-      const filters = [];
+      const ffo             = prepareFFmpegObject(media.file, progressCallback, this.debug);
+      const files           = {};
+      const filters         = [];
+      let mainVideoStream   = `0:${media.best.video.index}`;
+
+      //if we are using dvdsub, i can't bundle them in mp4 container, 
+      //so if we have found a best match, i'm going to burn them 
+      if (media.best.subtitle && imageSubtitleCodecs.includes(media.best.subtitle.codec_name.toLowerCase())) {
+        const newMainVideoStream = 'main_sub';
+       
+        filters.push({
+          filter: 'overlay',
+          options: 'main_w/2-overlay_w/2:main_h-overlay_h',
+          inputs: [ mainVideoStream, `0:${media.best.subtitle.index}` ],
+          outputs: newMainVideoStream
+        });
+
+        mainVideoStream = newMainVideoStream;
+      }
 
       media
         .outputs
@@ -145,17 +142,19 @@ class Transcoder {
               fs.unlinkSync(outFile);
           } catch(e) { }
 
+          //video filter
           filters.push(
-            `[${(!prevFilterName ? ('0:' + conf.video.track.index) : prevFilterName)}]` +
-            `scale=${conf.video.width}:${conf.video.height},` + 
-            'split=' + (i + 1 < outputs.length ? `2[${filterOutName}]` : '1') + `[${filterOutName}tofile]`
+            `[${mainVideoStream}]` +
+            `scale=${conf.video.width}:${conf.video.height}` +
+            `[${filterOutName}]` 
           );
-          
-            options.push('-t 30');
+
+          //options.push('-t 30');
+          //options.push('-ss 460');
 
           options.push(
-            '-maxrate ' + conf.video.maxbitrate,
-            '-bufsize ' + (conf.video.maxbitrate * 4)
+            '-maxrate ' + toKb(conf.video.maxbitrate),
+            '-bufsize ' + toKb(conf.video.maxbitrate * 4)
           );
 
           if (conf.threads) {
@@ -165,39 +164,30 @@ class Transcoder {
           if(conf.preset){
             options.push('-preset ' + conf.preset);
           }
-
-          //on va mapper l'audio
+          
+          //audio mapping
           conf.audio.tracks.forEach((track) => {
             options.push(`-map 0:${track.index}`);
-            if (track.index === media.best.audio.index) {
-              options.push(`-disposition:0:${track.index} default`);
-            }
           });
 
           //subtitles
           options.push('-scodec mov_text');
-          
-          conf.subtitle.tracks.forEach((track) => {
-            if (track.codec_name.toLowerCase() !== 'dvdsub') {
-              options.push(`-map 0:${track.index}`);
 
-              if (track.index === media.best.subtitle.index) {
-                options.push(`-disposition:0:${track.index} default`);
-              }
+          //include compatible subtitles in mp4 container
+          conf.subtitle.tracks.forEach((track) => {
+            if (!imageSubtitleCodecs.includes(track.codec_name.toLowerCase())) {
+              options.push(`-map 0:${track.index}`);
             }
           });
-          /**
-           * @todo incrust subtitles 
-           */
-
-          options.push(`-map [${filterOutName}tofile]`);
-          //options.push('-map 0:' + conf.video.track.index);
           
+          //video mapping
+          options.push(`-map [${filterOutName}]`);
+
           output.audioCodec(conf.audio.codec)
-                .audioBitrate(conf.audio.bitrate)
+                .audioBitrate(toKb(conf.audio.bitrate))
                 .audioChannels(conf.audio.channels)
                 .videoCodec(conf.video.codec)
-                .videoBitrate(conf.video.bitrate)
+                .videoBitrate(toKb(conf.video.bitrate))
                 .outputOptions(options)
                 .format(conf.format);
         });
@@ -205,7 +195,6 @@ class Transcoder {
       ffo.complexFilter(filters);
 
       ffo.on('error', (error, stdout, stderr) => {
-        console.log('ERROR CATCHED', error);
         reject(stderr || error || stdout);
       });
 
@@ -215,6 +204,12 @@ class Transcoder {
 
       ffo.run();
     });
+  }
+
+  extractSubtitles(media, outputDirectory, filePrefix) {
+    const promises = [];
+
+
   }
 };
 
