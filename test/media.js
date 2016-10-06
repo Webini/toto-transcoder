@@ -39,7 +39,7 @@ describe('Media', () => {
     });
 
     it('Should select first audio track and fallback to forced subtitles', () => {
-      const metadataCpy     = _.clone(metadata, true);
+      const metadataCpy     = _.merge({}, metadata);
       metadataCpy.streams.splice(8, 1);
       const media           = new Media({ metadata: metadataCpy });
       const audioNeeded     = metadataCpy.streams[0];
@@ -58,6 +58,22 @@ describe('Media', () => {
       media.selectBestAV(czLanguage);
 
       assert.deepStrictEqual(media.best.audio, audioNeeded);
+    });
+
+    it('Should have all subtitles in subtitles field', () => {
+      const media           = new Media({ metadata });
+      const subtitlesNeeded = [ 
+        metadata.streams[3], 
+        metadata.streams[4], 
+        metadata.streams[5],
+        metadata.streams[6],
+        metadata.streams[7],
+        metadata.streams[8]
+      ];
+
+      media.selectBestAV(czLanguage);
+
+      assert.deepStrictEqual(media.subtitles, subtitlesNeeded);
     });
   });
 
@@ -97,7 +113,6 @@ describe('Media', () => {
     }
 
     function cleanResult(result) {
-      delete result.subtitle;
       delete result.audio.tracks;
       delete result.video.track;
       return result;

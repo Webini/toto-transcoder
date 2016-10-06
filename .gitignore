@@ -4,3 +4,4 @@ garbage/
 !.gitkeep
 test/tmp/*
 test/ffmpeg-*
+test.js

@@ -3,7 +3,12 @@
     "debug": true,
     "thumbnails": {
         "delay": "1/60",
-        "width": "120"
+        "width": "120",
+        "columns": 7
+    },
+    "subtitles": {
+        "codec": "webvtt",
+        "extension": "vtt"
     },
     "presets": [
         {

@@ -1,10 +1,15 @@
-const Media  = require('./media.js');
-const FFmpeg = require('fluent-ffmpeg');
-const fs     = require('fs');
-const path   = require('path');
-const mkdir  = require('mkdirp');
+const Media       = require('./media.js');
+const FFmpeg      = require('fluent-ffmpeg');
+const fs          = require('fs');
+const path        = require('path');
+const mkdir       = require('mkdirp');
+const Montage     = require('./montage.js');
+const imagemagick = require('imagemagick');
+const rimraf      = require('rimraf');
+const map_639     = require('./iso-639-2.json');
 
 const imageSubtitleCodecs = [ 'dvdsub', 'dvbsub', 'vobsub' ]; 
+const DEFAULT_THUMB_COLUMNS = 6;
 
 /**
  * @param {String} file File path
@@ -40,16 +45,88 @@ function prepareFFmpegObject(file, progressCallback, debug) {
   return ffo;
 }
 
+/**
+ * @param {Number} bits
+ */
 function toKb(bits) {
   return parseInt(bits / 1024).toString() + 'k';
 }
 
+/**
+ * @param {String} file
+ * @param {String} fileComp
+ */
+function orderImage(file, fileComp) {
+  const nb     = parseFloat(file.match(/\.([0-9\.]+)\.jpg$/)[1]);
+  const nbComp = parseFloat(fileComp.match(/\.([0-9\.]+)\.jpg$/)[1]);
+  return nb - nbComp;
+}
+
+/**
+ * Combine images stack into one spritesheet
+ * @param {String} directory
+ * @param {String} output
+ * @param {Object.{cols, delay}} thumbsConfig
+ * @return {Promise}
+ */
+function combineThumbnails(directory, output, thumbsConfig) {
+  return new Promise((resolve, reject) => {
+    const mont = new Montage();
+    const { cols = DEFAULT_THUMB_COLUMNS, delay } = thumbsConfig;
+
+    var files = fs.readdirSync(directory); 
+    if(!files || files.length <= 0){
+      reject(new Error('Not files found'));
+      return;
+    }
+    
+    files.sort(orderImage);
+    
+    imagemagick.identify(path.join(directory, files[0]), (err, imageData) => {
+      if (err) {
+        try { rimraf.sync(directory); } catch(e) { }
+        reject(new Error(err));
+        return;
+      }
+
+      for (var i = 0; i < files.length; i++) {
+        mont.addInput(path.join(directory, files[i]));
+      }
+        
+      //transform images to spritesheet
+      mont.setBackground('black')
+        .setTile(cols)
+        .setGeometry(['+0', '+0'])
+        .setMode('concatenate')
+        .setOutput(output)
+        .convert()
+        .then((ret) => {
+          try { rimraf.sync(directory) } catch(e) { }
+          
+          resolve({
+            meta: {
+              quantity: files.length,
+              size: { width: imageData.width, height: imageData.height },
+              cols: cols,
+              delay
+            },
+            file: output
+          });
+        })
+        .catch((err) => {
+          reject(err);
+        });
+    });
+  });   
+}
+
 class Transcoder {
-  constructor({ presets, thumbnails = null, debug, preferredLang = '^fr.*' }) {
+  constructor({ presets, thumbnails = null, subtitles = null, debug, preferredLang = '^fr.*' }) {
     this.preferredLang = new RegExp(preferredLang, 'i');
     this.debug         = debug || (process.env.NODE_DEBUG || '').toLowerCase().split(' ').includes('toto-transcoder'); 
     this.presets       = presets;
     this.thumbnails    = thumbnails;
+    this.subtitles     = subtitles;
     this.defaultPreset = null;
 
     this.presets.forEach((preset) => {
@@ -107,8 +184,12 @@ class Transcoder {
     return new Promise((resolve, reject) => {
       const ffo             = prepareFFmpegObject(media.file, progressCallback, this.debug);
       const files           = {};
+      const dataOutput      = {
+        transcoded: files
+      };
       const filters         = [];
       let mainVideoStream   = `0:${media.best.video.index}`;
+      let thumbnails        = null;
 
       //if we are using dvdsub, i can't bundle them in mp4 container, 
       //so if we have found a best match, i'm going to burn them 
@@ -211,10 +292,12 @@ class Transcoder {
           );
 
           output.outputOptions([ '-map [thumbs]' ]);
-        } catch(e) {}
 
-        //@todo imagemagick op after transco
-        files.thumbnails = finalFile;
+          thumbnails = {
+            directory: directory,
+            finalFile: finalFile,
+          };
+        } catch(e) {}
       }
 
       ffo.complexFilter(filters);
@@ -224,7 +307,16 @@ class Transcoder {
       });
 
       ffo.on('end', () => {
-        resolve(files);
+        if (thumbnails) {
+          combineThumbnails(thumbnails.directory, thumbnails.finalFile, this.thumbnails)
+            .then((data) => {
+              dataOutput.thumbnails = data;
+              resolve(dataOutput);
+            })
+            .catch((err) => resolve(dataOutput)); //thumbnails are not guaranteed with our transcoding lib
+        } else {
+          resolve(dataOutput);
+        }
       });
 
       ffo.run();
@@ -232,9 +324,54 @@ class Transcoder {
   }
 
   extractSubtitles(media, outputDirectory, filePrefix) {
-    const promises = [];
+    return new Promise((resolve, reject) => {
+      const ffo        = prepareFFmpegObject(media.file, null, this.debug);
+      const dataOutput = [];
 
+      const subtitles = media.subtitles.filter((subtitle) => {
+        return !imageSubtitleCodecs.includes(subtitle.codec_name);
+      });
+      
+      if (subtitles.length <= 0) {
+        resolve(dataOutput);
+        return;
+      }
 
+      subtitles.forEach((subtitle) => {
+        const file   = path.join(outputDirectory, `${filePrefix}.${subtitle.index}.${this.subtitles.extension}`);
+        const output = ffo.output(file);
+
+        output.outputOptions([
+          `-scodec ${this.subtitles.codec}`,
+          `-map 0:${subtitle.index}`,
+          '-an',
+          '-vn'
+        ]);
+        
+        const code_639_2 = (subtitle.tags && subtitle.tags.language !== 'und' ? subtitle.tags.language : null);
+        const language = (code_639_2 ? map_639[code_639_2].label : null);
+        dataOutput.push({
+          label: (subtitle.tags ? subtitle.tags.title : null) || language || 'No Name',
+          lang_639_2: code_639_2,
+          lang_639_1: (code_639_2 ? map_639[code_639_2].code : null),
+          lang: language || 'Unknown',
+          default: (subtitle === media.best.subtitle),
+          forced: subtitle.disposition.forced ? true : false,
+          file: file
+        });
+      });
+
+      ffo.on('error', (error, stdout, stderr) => {
+        reject(stderr || error || stdout);
+      });
+
+      ffo.on('end', () => {
+        //@todo strip null bytes from files 
+        resolve(dataOutput);
+      });
+
+      ffo.run();
+    });
   }
 };
 

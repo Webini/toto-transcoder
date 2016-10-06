@@ -76,10 +76,9 @@ class Media {
     this.customSubtitle = subtitle;
     this.best           = {
       audio: null,
-      subtitle: null,
       video: null
     };
-
+    this.subtitles      = null;
     this.outputs        = null;
   }
 
@@ -92,8 +91,9 @@ class Media {
 
     assert.ok(allAudioTracks.length > 0, 'Cannot found any audio track');
 
+    this.subtitles    = findTracks('subtitle', this.metadata.streams);
     const audioTracks = findTracks('audio', allAudioTracks, preferredLanguage);
-    const subTracks   = findTracks('subtitle', this.metadata.streams, preferredLanguage);
+    const subTracks   = findTracks('subtitle', this.subtitles, preferredLanguage);
 
     //audio found
     if(audioTracks.length > 0){
@@ -159,11 +159,9 @@ class Media {
     const video           = this.best.video;
     const outputs         = [];
     const audioTracks     = findTracks('audio', this.metadata.streams);
-    const subtitlesTracks = findTracks('subtitle', this.metadata.streams);
     
     const baseConf = {
       audio:    { tracks: audioTracks },
-      subtitle: { tracks: subtitlesTracks },
       video:    { track: this.best.video }
     };
 
