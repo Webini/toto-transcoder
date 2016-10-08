@@ -305,7 +305,8 @@ class Transcoder {
         const file      = path.join(directory, `${filePrefix}.%03d.jpg`);
         const finalFile = path.join(outputDirectory, `${filePrefix}.thumbs.jpg`);
         const output    = ffo.output(file);
-        
+        const options   = [];
+
         try {
           mkdir.sync(directory);
 
@@ -315,13 +316,15 @@ class Transcoder {
             `scale=${this.thumbnails.width || -1}:${this.thumbnails.height || -1}` +
             `[thumbs]` 
           );
-          
+
           if (this.debug) {
             options.push('-t 30');
           //options.push('-ss 460');
           }
 
-          output.outputOptions([ '-map [thumbs]' ]);
+          options.push('-map [thumbs]');
+
+          output.outputOptions(options);
 
           thumbnails = {
             directory: directory,
