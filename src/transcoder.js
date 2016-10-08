@@ -315,6 +315,11 @@ class Transcoder {
             `scale=${this.thumbnails.width || -1}:${this.thumbnails.height || -1}` +
             `[thumbs]` 
           );
+          
+          if (this.debug) {
+            options.push('-t 30');
+          //options.push('-ss 460');
+          }
 
           output.outputOptions([ '-map [thumbs]' ]);
 
