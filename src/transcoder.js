@@ -8,7 +8,7 @@ const imagemagick = require('imagemagick');
 const rimraf      = require('rimraf');
 const map_639     = require('./iso-639-2.json');
 
-const imageSubtitleCodecs = [ 'dvdsub', 'dvbsub', 'vobsub' ]; 
+const imageSubtitleCodecs = [ 'dvdsub', 'dvbsub', 'vobsub', 'hdmv_pgs_subtitle' ]; 
 const DEFAULT_THUMB_COLUMNS = 6;
 
 /**
