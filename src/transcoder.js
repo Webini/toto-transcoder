@@ -253,8 +253,10 @@ class Transcoder {
             `[${filterOutName}]` 
           );
 
-          //options.push('-t 30');
+          if (this.debug) {
+            options.push('-t 30');
           //options.push('-ss 460');
+          }
 
           options.push(
             '-maxrate ' + toKb(conf.video.maxbitrate),
