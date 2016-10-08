@@ -62,11 +62,21 @@ function orderImage(file, fileComp) {
   return nb - nbComp;
 }
 
+function statFile(file) {
+  try {
+    return fs.statSync(file)['size'];
+  } catch(e) { 
+    return null;
+  }
+}
+
 /**
  * Combine images stack into one spritesheet
  * @param {String} directory
  * @param {String} output
- * @param {Object.{cols, delay}} thumbsConfig
+ * @param {Object} thumbsConfig
+ * @param {integer} thumbsConfig.cols Columns Number
+ * @param {string} thumbsConfig.delay Thumbnails delay
  * @return {Promise}
  */
 function combineThumbnails(directory, output, thumbsConfig) {
@@ -76,7 +86,7 @@ function combineThumbnails(directory, output, thumbsConfig) {
 
     var files = fs.readdirSync(directory); 
     if(!files || files.length <= 0){
-      reject(new Error('Not files found'));
+      reject(new Error('Not thumbnails found'));
       return;
     }
     
@@ -110,7 +120,8 @@ function combineThumbnails(directory, output, thumbsConfig) {
               cols: cols,
               delay
             },
-            file: output
+            file: output,
+            size: statFile(output)
           });
         })
         .catch((err) => {
@@ -183,11 +194,14 @@ class Transcoder {
   transcode(media, outputDirectory, filePrefix, progressCallback) {
     return new Promise((resolve, reject) => {
       const ffo             = prepareFFmpegObject(media.file, progressCallback, this.debug);
-      const files           = {};
       const dataOutput      = {
-        transcoded: files
+        transcoded: {},
+        subtitles: []
       };
       const filters         = [];
+      const subtitles       = media.subtitles.filter((subtitle) => {
+        return !imageSubtitleCodecs.includes(subtitle.codec_name);
+      });
       let mainVideoStream   = `0:${media.best.video.index}`;
       let thumbnails        = null;
 
@@ -206,6 +220,7 @@ class Transcoder {
         mainVideoStream = newMainVideoStream;
       }
 
+      //transco presets
       media
         .outputs
         .sort((first, second) => { //we need to desc order for complex filters 
@@ -218,7 +233,14 @@ class Transcoder {
           const filterOutName  = conf.name;
           const prevFilterName = (i > 0 ? outputs[i-1].name : null);
 
-          files[conf.name] = file;
+          dataOutput.transcoded[conf.name] = { 
+            file,
+            duration: media.best.video.duration,
+            resolution: {
+              width: conf.video.width,
+              height: conf.video.height
+            }
+          };
 
           //trying to remove file if exists
           try {
@@ -257,10 +279,8 @@ class Transcoder {
           options.push('-scodec mov_text');
 
           //include compatible subtitles in mp4 container
-          conf.subtitle.tracks.forEach((track) => {
-            if (!imageSubtitleCodecs.includes(track.codec_name.toLowerCase())) {
-              options.push(`-map 0:${track.index}`);
-            }
+          subtitles.forEach((track) => {
+            options.push(`-map 0:${track.index}`);
           });
           
           //video mapping
@@ -275,6 +295,7 @@ class Transcoder {
                 .format(conf.format);
         });
 
+      //thumbnails processing
       if (this.thumbnails) {
         const directory = path.join(outputDirectory, 'thumbs');
         const file      = path.join(directory, `${filePrefix}.%03d.jpg`);
@@ -300,6 +321,33 @@ class Transcoder {
         } catch(e) {}
       }
 
+      //subtitles extraction
+      if (subtitles.length > 0) {
+        subtitles.forEach((subtitle) => {
+          const file   = path.join(outputDirectory, `${filePrefix}.${subtitle.index}.${this.subtitles.extension}`);
+          const output = ffo.output(file);
+
+          output.outputOptions([
+            `-scodec ${this.subtitles.codec}`,
+            `-map 0:${subtitle.index}`,
+            '-an',
+            '-vn'
+          ]);
+          
+          const code_639_2 = (subtitle.tags && subtitle.tags.language !== 'und' ? subtitle.tags.language : null);
+          const language = (code_639_2 ? map_639[code_639_2].label : null);
+          dataOutput.subtitles.push({
+            label: (subtitle.tags ? subtitle.tags.title : null) || language || 'No Name',
+            lang_639_2: code_639_2,
+            lang_639_1: (code_639_2 ? map_639[code_639_2].code : null),
+            lang: language,
+            default: (subtitle === media.best.subtitle),
+            forced: subtitle.disposition.forced ? true : false,
+            file: file
+          });
+        });
+      }
+
       ffo.complexFilter(filters);
 
       ffo.on('error', (error, stdout, stderr) => {
@@ -307,67 +355,29 @@ class Transcoder {
       });
 
       ffo.on('end', () => {
+        const promises = [];
+
         if (thumbnails) {
-          combineThumbnails(thumbnails.directory, thumbnails.finalFile, this.thumbnails)
-            .then((data) => {
-              dataOutput.thumbnails = data;
-              resolve(dataOutput);
-            })
-            .catch((err) => resolve(dataOutput)); //thumbnails are not guaranteed with our transcoding lib
-        } else {
-          resolve(dataOutput);
+          promises.push(
+            combineThumbnails(thumbnails.directory, thumbnails.finalFile, this.thumbnails)
+              .then((data) => { dataOutput.thumbnails = data; })
+              .catch((err) => true) //@todo logger
+          );
         }
-      });
 
-      ffo.run();
-    });
-  }
+        for(var preset in dataOutput.transcoded) {
+          dataOutput.transcoded[preset].size = statFile(dataOutput.transcoded[preset].file);
+        }
 
-  extractSubtitles(media, outputDirectory, filePrefix) {
-    return new Promise((resolve, reject) => {
-      const ffo        = prepareFFmpegObject(media.file, null, this.debug);
-      const dataOutput = [];
-
-      const subtitles = media.subtitles.filter((subtitle) => {
-        return !imageSubtitleCodecs.includes(subtitle.codec_name);
-      });
-      
-      if (subtitles.length <= 0) {
-        resolve(dataOutput);
-        return;
-      }
-
-      subtitles.forEach((subtitle) => {
-        const file   = path.join(outputDirectory, `${filePrefix}.${subtitle.index}.${this.subtitles.extension}`);
-        const output = ffo.output(file);
-
-        output.outputOptions([
-          `-scodec ${this.subtitles.codec}`,
-          `-map 0:${subtitle.index}`,
-          '-an',
-          '-vn'
-        ]);
-        
-        const code_639_2 = (subtitle.tags && subtitle.tags.language !== 'und' ? subtitle.tags.language : null);
-        const language = (code_639_2 ? map_639[code_639_2].label : null);
-        dataOutput.push({
-          label: (subtitle.tags ? subtitle.tags.title : null) || language || 'No Name',
-          lang_639_2: code_639_2,
-          lang_639_1: (code_639_2 ? map_639[code_639_2].code : null),
-          lang: language || 'Unknown',
-          default: (subtitle === media.best.subtitle),
-          forced: subtitle.disposition.forced ? true : false,
-          file: file
+        dataOutput.subtitles.map((subtitle) => {
+          subtitle.size = statFile(subtitle.file);
+          return subtitle
         });
-      });
 
-      ffo.on('error', (error, stdout, stderr) => {
-        reject(stderr || error || stdout);
-      });
-
-      ffo.on('end', () => {
-        //@todo strip null bytes from files 
-        resolve(dataOutput);
+        Promise
+          .all(promises)
+          .then(() => resolve(dataOutput))
+          .catch((err) => reject(err));
       });
 
       ffo.run();

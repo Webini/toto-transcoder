@@ -10,7 +10,7 @@ describe('Transcoder', () => {
   const presets    = require('./resources/presets-video.json');
   const thumbnails = {
     delay: "1",
-    width: "120",
+    width: 120,
     cols: 3
   };
   const subtitles = {
@@ -42,9 +42,23 @@ describe('Transcoder', () => {
     });
 
     it('Can make basic transcoding with progression', function(done) {
+      this.timeout(60000);
       let progressSeen = false;
       const expectedResult = {
-        transcoded: {},
+        transcoded: {
+          '480p': {
+            duration: 9.466667,
+            resolution: { width: 854, height: 480 }
+          },
+          '720p': {
+            duration: 9.466667,
+            resolution: { width: 1280, height: 720 }
+          },
+          '1080p': {
+            duration: 9.466667,
+            resolution: { width: 1920, height: 1080 }
+          }
+        },
         thumbnails: {
           file: path.join(outputDir, `${filePrefix}.thumbs.jpg`),
           meta: {
@@ -53,24 +67,49 @@ describe('Transcoder', () => {
             quantity: 12,
             size: {
               height: 68,
-              width: 120
+              width: thumbnails.width
             }
+          },
+          size: 36633
+        },
+        subtitles: [
+          {
+            default: false,
+            file: path.join(outputDir, 'test.0.vtt'),
+            forced: false,
+            label: "No Name",
+            lang: null,
+            lang_639_1: null,
+            lang_639_2: null,
+            size: 328
+          },
+          {
+            default: false,
+            file: path.join(outputDir, 'test.1.vtt'),
+            forced: false,
+            label: "No Name",
+            lang: null,
+            lang_639_1: null,
+            lang_639_2: null,
+            size: 368
           }
-        }
+        ]
       };
-      this.timeout(60000);
 
       presets.forEach((preset) => {
-        expectedResult.transcoded[preset.name] = path.join(outputDir, `${filePrefix}.${preset.name}.${preset.format}`);
+        expectedResult.transcoded[preset.name].file = path.join(outputDir, `${filePrefix}.${preset.name}.${preset.format}`);
       });
     
       after(() => {
-        try {
-          for (var key in expectedResult.transcoded) {
-            fs.unlinkSync(expectedResult.transcoded[key]);
-          }
-          fs.unlinkSync(expectedResult.thumbnails.file);
-        } catch(e) {}
+        for (var key in expectedResult.transcoded) {
+          fs.unlinkSync(expectedResult.transcoded[key].file);
+        }
+
+        expectedResult.subtitles.forEach((subtitle) => {
+          fs.unlinkSync(subtitle.file);
+        });
+        
+        fs.unlinkSync(expectedResult.thumbnails.file);
       });
 
       transco
@@ -84,23 +123,14 @@ describe('Transcoder', () => {
           if (!progressSeen) {
             throw new Error('Progression error');
           } else {
-            console.log(result);
+            presets.forEach((preset) => {
+              expectedResult.transcoded[preset.name].size = result.transcoded[preset.name].size;
+            });
+
             assert.deepStrictEqual(result, expectedResult);
             done();
           }
         })
-        .catch((err) => done(err));
-    });
-
-    it.only('Can exctract subtitles', function(done) {
-      this.timeout(5555000);
-
-      transco
-        .prepare(@todo)
-        .then((media) => {
-          return transco.extractSubtitles(media, outputDir, 'subtitle');
-        })
-        .then(() => done())
         .catch((err) => done(err));
     });
   });

@@ -1,0 +1,5 @@
+System dependencies
+===================
+
+- ffmpeg
+- imagemagick
