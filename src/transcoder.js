@@ -336,15 +336,23 @@ class Transcoder {
       //subtitles extraction
       if (subtitles.length > 0) {
         subtitles.forEach((subtitle) => {
-          const file   = path.join(outputDirectory, `${filePrefix}.${subtitle.index}.${this.subtitles.extension}`);
-          const output = ffo.output(file);
+          const file    = path.join(outputDirectory, `${filePrefix}.${subtitle.index}.${this.subtitles.extension}`);
+          const output  = ffo.output(file);
+          const options = [];
 
-          output.outputOptions([
+          if (this.debug) {
+            options.push('-t 30');
+          //options.push('-ss 460');
+          }
+
+          options.push(
             `-scodec ${this.subtitles.codec}`,
             `-map 0:${subtitle.index}`,
             '-an',
             '-vn'
-          ]);
+          );
+
+          output.outputOptions(options);
           
           const code_639_2 = (subtitle.tags && subtitle.tags.language !== 'und' ? subtitle.tags.language : null);
           const language = (code_639_2 ? map_639[code_639_2].label : null);
