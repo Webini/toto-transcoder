@@ -229,7 +229,7 @@ class Transcoder {
           return (second.vbitrate + second.abitrate) - (first.vbitrate + first.abitrate);
         })
         .forEach((conf, i, outputs) => {
-          const file           = path.join(outputDirectory, `${filePrefix}.${conf.name}${conf.format ? '.' + conf.format : ''}`);
+          const file           = path.join(outputDirectory, `${filePrefix}.${conf.name}${conf.extension ? '.' + conf.extension : ''}`);
           const output         = ffo.output(file);
           const options        = [];
           const filterOutName  = conf.name;
