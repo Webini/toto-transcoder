@@ -191,7 +191,10 @@ class Transcoder {
    * @return {Promise} 
    */
   transcode(media, outputDirectory, filePrefix, progressCallback) {
-    const ffo     = prepareFFmpegObject(media.file, progressCallback, this.debug);
+    const ffo = prepareFFmpegObject(media.file, progressCallback, this.debug);
+
+    try { mkdir.sync(outputDirectory); } catch(e) {}
+
     const promise = new Promise((resolve, reject) => {
       const dataOutput      = {
         transcoded: {},
