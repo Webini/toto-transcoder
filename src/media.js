@@ -68,12 +68,10 @@ class Media {
    * Constructor
    * @param {String} file File path
    * @param {Object} metadata Ffmpeg metadata
-   * @param {String} subtitle path
    */
-  constructor({ file, metadata, subtitle = null }) {
+  constructor({ file, metadata }) {
     this.file           = file;
     this.metadata       = metadata;
-    this.customSubtitle = subtitle;
     this.best           = {
       audio: null,
       video: null
@@ -148,7 +146,7 @@ class Media {
   /**
    * Select qualities presets for transco
    * @param {Array[Object]} presets
-   * @param {Object} defaultPreset
+   * @param {Object} defaultPreset cf root directory => config.json : presets
    * @return {Media}
    */
   selectPresets(presets, defaultPreset) {

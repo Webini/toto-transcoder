@@ -20,13 +20,6 @@ describe('Transcoder', () => {
   const transco    = new Transcoder({ presets, thumbnails, subtitles });
 
   describe('#prepare', () => {
-    it('Can\'t open subtitles', (done) => {
-      transco
-        .prepare(mediaFile1, 'notfound')
-        .then(() => done(new Error('It should not found file')))
-        .catch((err) => done());
-    });
-
     it('Can\'t open media file', (done) => {
       transco
         .prepare('notfound')
@@ -39,6 +32,45 @@ describe('Transcoder', () => {
         .prepare(mediaFile1)
         .then(() => done())
         .catch((err) => done(err));
+    });
+  });
+
+  describe('#transcode', () => {
+    it('Can immediatly kill a transcoding instance', function(done) {
+      this.timeout(60000);
+  
+      transco
+        .prepare(mediaFile1)
+        .then((media) => {
+          const transcoPromise = transco.transcode(media, outputDir, filePrefix);
+
+          transcoPromise.kill();
+          return transcoPromise;
+        })
+        .then((data) => {
+          done(new Error('Transcoding finished'));
+        })
+        .catch((err) => done());
+    });
+
+    it('Can kill a transcoding instance after run', function(done) {
+      this.timeout(60000);
+  
+      transco
+        .prepare(mediaFile1)
+        .then((media) => {
+          const transcoPromise = transco.transcode(media, outputDir, filePrefix);
+
+          setTimeout(() => {
+            transcoPromise.kill();
+          }, 200);
+
+          return transcoPromise;
+        })
+        .then((data) => {
+          done(new Error('Transcoding finished'));
+        })
+        .catch((err) => done());
     });
 
     it('Can make basic transcoding with progression', function(done) {

@@ -33,11 +33,15 @@ function prepareFFmpegObject(file, progressCallback, debug) {
     ffo.on('progress', progressCallback);
   }
   
-  if (debug) {
-    ffo.on('start', (commandLine) => {
+  ffo.on('start', (commandLine) => {
+    if (debug) {
       console.log('Spawned Ffmpeg with command: ' + commandLine);
-    });
-  }
+    }
+
+    if (ffo.killed) {
+      ffo.kill('SIGKILL');
+    }
+  });
 
   ffo.on('end', removeListener);
   ffo.on('error', removeListener);
@@ -154,17 +158,12 @@ class Transcoder {
   /**
    * Create the media object for the transcoding
    * @param {String} inputFile
-   * @param {String|undefined|null} subtitleFile
    * @param {Array} preset Name of the presets used for the transco 
    * @return {Promise}
    */
-  prepare(inputFile, subtitleFile) {
+  prepare(inputFile) {
     return new Promise((resolve, reject) => {
-      const media = new Media({ file: inputFile, subtitle: subtitleFile });
-
-      if (media.customSubtitle) {
-        fs.accessSync(media.customSubtitle);
-      }
+      const media = new Media({ file: inputFile });
 
       FFmpeg.ffprobe(media.file, (err, metadata) => {
         if(err){
@@ -192,8 +191,8 @@ class Transcoder {
    * @return {Promise} 
    */
   transcode(media, outputDirectory, filePrefix, progressCallback) {
-    return new Promise((resolve, reject) => {
-      const ffo             = prepareFFmpegObject(media.file, progressCallback, this.debug);
+    const ffo     = prepareFFmpegObject(media.file, progressCallback, this.debug);
+    const promise = new Promise((resolve, reject) => {
       const dataOutput      = {
         transcoded: {},
         subtitles: []
@@ -351,7 +350,11 @@ class Transcoder {
       ffo.complexFilter(filters);
 
       ffo.on('error', (error, stdout, stderr) => {
-        reject(stderr || error || stdout);
+        if (ffo.killed) {
+          reject(new Error('FFmpeg killed'));
+        } else {
+          reject(stderr || error || stdout);
+        }
       });
 
       ffo.on('end', () => {
@@ -379,9 +382,16 @@ class Transcoder {
           .then(() => resolve(dataOutput))
           .catch((err) => reject(err));
       });
-
+      
       ffo.run();
     });
+
+    promise.kill = function(){
+      ffo.killed = true;
+      ffo.kill('SIGKILL');
+    };  
+
+    return promise;
   }
 };
 
