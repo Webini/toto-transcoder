@@ -237,7 +237,7 @@ class Transcoder {
 
           dataOutput.transcoded[conf.name] = { 
             file,
-            duration: media.best.video.duration,
+            duration: (media.best.video.duration !== 'N/A' ? media.best.video.duration : null),
             resolution: {
               width: conf.video.width,
               height: conf.video.height
@@ -389,8 +389,18 @@ class Transcoder {
           );
         }
 
+        //add transcoded informations
         for(var preset in dataOutput.transcoded) {
-          dataOutput.transcoded[preset].size = statFile(dataOutput.transcoded[preset].file);
+          const transcoded = dataOutput.transcoded[preset]; 
+          transcoded.size = statFile(transcoded.file);
+
+          if (!transcoded.duration) {
+            promises.push(
+              this.prepare(dataOutput.transcoded[preset].file)
+                .then((media) => { transcoded.duration = media.best.video.duration; })
+                .catch((err) => true)
+            );
+          }
         }
 
         dataOutput.subtitles.map((subtitle) => {
