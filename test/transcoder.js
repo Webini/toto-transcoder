@@ -5,7 +5,7 @@ const fs         = require('fs');
 
 describe('Transcoder', () => {
   const outputDir  = path.join(__dirname, 'tmp');
-  const filePrefix = 'test';
+  const filePrefix = 'test%';
   const mediaFile1 = path.join(__dirname, 'resources/bbb-625-10.mp4');
   const presets    = require('./resources/presets-video.json');
   const thumbnails = {
@@ -76,6 +76,8 @@ describe('Transcoder', () => {
     it('Can make basic transcoding with progression', function(done) {
       this.timeout(60000);
       let progressSeen = false;
+      let expectedFilePrefix = filePrefix.replace(/%/g, '_');
+
       const expectedResult = {
         transcoded: {
           '480p': {
@@ -92,7 +94,7 @@ describe('Transcoder', () => {
           }
         },
         thumbnails: {
-          file: path.join(outputDir, `${filePrefix}.thumbs.jpg`),
+          file: path.join(outputDir, `${expectedFilePrefix}.thumbs.jpg`),
           meta: {
             cols: thumbnails.cols,
             delay: thumbnails.delay,
@@ -107,7 +109,7 @@ describe('Transcoder', () => {
         subtitles: [
           {
             default: false,
-            file: path.join(outputDir, 'test.0.vtt'),
+            file: path.join(outputDir, `${expectedFilePrefix}.0.vtt`),
             forced: false,
             label: "No Name",
             lang: null,
@@ -117,7 +119,7 @@ describe('Transcoder', () => {
           },
           {
             default: false,
-            file: path.join(outputDir, 'test.1.vtt'),
+            file: path.join(outputDir, `${expectedFilePrefix}.1.vtt`),
             forced: false,
             label: "No Name",
             lang: null,
@@ -129,7 +131,7 @@ describe('Transcoder', () => {
       };
 
       presets.forEach((preset) => {
-        expectedResult.transcoded[preset.name].file = path.join(outputDir, `${filePrefix}.${preset.name}.${preset.format}`);
+        expectedResult.transcoded[preset.name].file = path.join(outputDir, `${expectedFilePrefix}.${preset.name}.${preset.format}`);
       });
     
       after(() => {

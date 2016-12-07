@@ -186,12 +186,13 @@ class Transcoder {
    * Transcode file
    * @param {Media} Media object 
    * @param {String} outputDirectory output directory for the transcoded files
-   * @param {String} filePrefix filename, then we will concat quality name & container extension
+   * @param {String} filePrefix filename, then we will concat quality name & container extension, it can't contain % char
    * @param {Function|null} progressCallback
    * @return {Promise} 
    */
   transcode(media, outputDirectory, filePrefix, progressCallback) {
-    const ffo = prepareFFmpegObject(media.file, progressCallback, this.debug);
+    const ffo  = prepareFFmpegObject(media.file, progressCallback, this.debug);
+    filePrefix = filePrefix.replace(/%/g, '_');
 
     try { mkdir.sync(outputDirectory); } catch(e) {}
 
