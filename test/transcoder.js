@@ -76,7 +76,7 @@ describe('Transcoder', () => {
     it('Can make basic transcoding with progression', function(done) {
       this.timeout(60000);
       let progressSeen = false;
-      let expectedFilePrefix = filePrefix.replace(/%/g, '_');
+      let expectedFilePrefix = filePrefix;
 
       const expectedResult = {
         transcoded: {

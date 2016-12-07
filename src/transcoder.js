@@ -192,7 +192,6 @@ class Transcoder {
    */
   transcode(media, outputDirectory, filePrefix, progressCallback) {
     const ffo  = prepareFFmpegObject(media.file, progressCallback, this.debug);
-    filePrefix = filePrefix.replace(/%/g, '_');
 
     try { mkdir.sync(outputDirectory); } catch(e) {}
 
@@ -303,7 +302,7 @@ class Transcoder {
       //thumbnails processing
       if (this.thumbnails) {
         const directory = path.join(outputDirectory, 'thumbs');
-        const file      = path.join(directory, `${filePrefix}.%03d.jpg`);
+        const file      = path.join(directory, filePrefix).replace(/%/g, '%%') + '.%03d.jpg';
         const finalFile = path.join(outputDirectory, `${filePrefix}.thumbs.jpg`);
         const output    = ffo.output(file);
         const options   = [];
