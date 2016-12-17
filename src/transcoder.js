@@ -136,13 +136,14 @@ function combineThumbnails(directory, output, thumbsConfig) {
 }
 
 class Transcoder {
-  constructor({ presets, thumbnails = null, subtitles = null, debug, preferredLang = '^fr.*' }) {
+  constructor({ presets, thumbnails = null, subtitles = null, hwAccel = false, debug, preferredLang = '^fr.*' }) {
     this.preferredLang = new RegExp(preferredLang, 'i');
     this.debug         = debug || (process.env.NODE_DEBUG || '').toLowerCase().split(' ').includes('toto-transcoder'); 
     this.presets       = presets;
     this.thumbnails    = thumbnails;
     this.subtitles     = subtitles;
     this.defaultPreset = null;
+    this.hwAccel       = hwAccel;
 
     this.presets.forEach((preset) => {
       if (preset.default) {
@@ -194,6 +195,10 @@ class Transcoder {
     const ffo  = prepareFFmpegObject(media.file, progressCallback, this.debug);
 
     try { mkdir.sync(outputDirectory); } catch(e) {}
+
+    if (this.hwAccel) {
+      ffo.addInputOption(`-hwaccel ${this.hwAccel}`)
+    }
 
     const promise = new Promise((resolve, reject) => {
       const dataOutput      = {
