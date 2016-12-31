@@ -1,0 +1,106 @@
+{
+    "transcoders": {
+        "cpu": {
+            "maxInstances": 4,
+            "encoders": {
+                "h264": "libx264",
+                "aac": "aac",
+                "mov_text": "mov_text"
+            },
+            "codecBlacklist": [
+                "dvd_subtitle", "dvb_subtitle", "hdmv_pgs_subtitle"
+            ]
+        },
+        "nvidia": {
+            "maxInstances": 2,
+            "encoders": { 
+                "h264": "h264_nvenc", 
+                "hevc": "hevc_nvenc",
+                "aac": "aac",
+                "mov_text": "mov_text"
+            },
+            "decoders": {
+                "h263": "h263_cuvid",
+                "h264": "h264_cuvid",
+                "hevc": "hevc_cuvid",
+                "mjpeg": "mjpeg_cuvid",
+                "mpeg1video": "mpeg1_cuvid",
+                "mpeg2video": "mpeg2_cuvid",
+                "mpeg4": "mpeg4_cuvid",
+                "vc1": "vc1_cuvid",
+                "vp8": "vp8_cuvid",
+                "vp9": "vp9_cuvid"
+            },
+            "hwDecoder": "cuvid",
+            "codecBlacklist": [
+                "dvd_subtitle", "dvb_subtitle", "hdmv_pgs_subtitle"
+            ]
+        }
+    },
+    "presets": [
+        {
+            "default": true,
+            "name": "480p",
+            "video": {
+                "codec": "h264",
+                "bitrate": 516096,
+                "maxbitrate": 516096,
+                "width": 720,
+                "height": 480,
+                "preset": "slow"
+            },
+            "audio": {
+                "codec": "aac",
+                "bitrate": 98304,
+                "channels": 2
+            },
+            "subtitle": {
+                "codec": "mov_text"
+            },
+            "format": "mp4",
+            "extension": "mp4"
+        },
+        {
+            "name": "720p",
+            "video": {
+                "codec": "h264",
+                "bitrate": 890880,
+                "maxbitrate": 890880,
+                "width": 1280,
+                "height": 720,
+                "preset": "slow"
+            },
+            "audio": {
+                "codec": "aac",
+                "bitrate": 131072,
+                "channels": 2
+            },
+            "subtitle": {
+                "codec": "mov_text"
+            },
+            "format": "mp4",
+            "extension": "mp4"
+        },
+        {
+            "name": "1080p",
+            "video": {
+                "codec": "h264",
+                "bitrate": 1884160,
+                "maxbitrate": 1884160,
+                "width": 1920, 
+                "height": 1080,
+                "preset": "slow"
+            },
+            "audio": {
+                "codec": "aac",
+                "bitrate": 163840,
+                "channels": 2
+            },
+            "subtitle": {
+                "codec": "mov_text"
+            },
+            "format": "mp4",
+            "extension": "mp4"
+        }
+    ]
+}

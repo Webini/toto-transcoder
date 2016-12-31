@@ -19,22 +19,6 @@ describe('Transcoder', () => {
   };
   const transco    = new Transcoder({ presets, thumbnails, subtitles });
 
-  describe('#prepare', () => {
-    it('Can\'t open media file', (done) => {
-      transco
-        .prepare('notfound')
-        .then(() => done(new Error('It should not found file')))
-        .catch((err) => done());
-    });
-
-    it('Can prepare media file', (done) => {
-      transco
-        .prepare(mediaFile1)
-        .then(() => done())
-        .catch((err) => done(err));
-    });
-  });
-
   describe('#transcode', () => {
     it('Can immediatly kill a transcoding instance', function(done) {
       this.timeout(60000);

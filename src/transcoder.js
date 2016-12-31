@@ -156,32 +156,6 @@ class Transcoder {
     }
   };
 
-  /**
-   * Create the media object for the transcoding
-   * @param {String} inputFile
-   * @param {Array} preset Name of the presets used for the transco 
-   * @return {Promise}
-   */
-  prepare(inputFile) {
-    return new Promise((resolve, reject) => {
-      const media = new Media({ file: inputFile });
-
-      FFmpeg.ffprobe(media.file, (err, metadata) => {
-        if(err){
-          return reject(err);
-        }
-        
-        media.metadata = metadata;
-        
-        resolve(
-          media.selectBestAV(this.preferredLang)
-               .selectVideoTrack(this.presets, this.defaultPreset)
-               .selectPresets(this.presets, this.defaultPreset)
-        );
-      });
-    });
-  }
-
 
   /**
    * Transcode file

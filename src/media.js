@@ -1,6 +1,7 @@
 const assert      = require('assert');
 const forcedRegex = /force/i; //to find forced subtitles 
 const _           = require('lodash');
+const FFmpeg      = require('fluent-ffmpeg');
 
 /**
  * Find all tracks for a given codec and a specific regex
@@ -72,35 +73,46 @@ class Media {
   constructor({ file, metadata }) {
     this.file           = file;
     this.metadata       = metadata;
-    this.best           = {
-      audio: null,
-      video: null
-    };
-    this.subtitles      = null;
-    this.outputs        = null;
+  }
+
+  get metadata() {
+    return this._metadata;
+  }
+
+  set metadata(metadata) {
+    if (metadata && metadata.streams) {
+      this.tracks = {
+        audio:    findTracks('audio', metadata.streams),
+        video:    findTracks('video', metadata.streams),
+        subtitle: findTracks('subtitle', metadata.streams),
+      }
+    } else {
+      this.tracks = { audio: [], video: [], subtitle: [] };
+    }
+
+    this._metadata = metadata;
   }
 
   /**
+   * Find best audio and subtitles tracks
    * @param {RegExp} preferredLanguage Regex to find preferred language
    * @return {Media}
    */
-  selectBestAV(preferredLanguage) {
-    const allAudioTracks = findTracks('audio', this.metadata.streams);
+  findBestAS(preferredLanguage) {
+    assert.ok(this.tracks.audio.length > 0, 'Cannot found any audio track');
 
-    assert.ok(allAudioTracks.length > 0, 'Cannot found any audio track');
-
-    this.subtitles    = findTracks('subtitle', this.metadata.streams);
-    const audioTracks = findTracks('audio', allAudioTracks, preferredLanguage);
-    const subTracks   = findTracks('subtitle', this.subtitles, preferredLanguage);
+    const audioTracks = findTracks('audio', this.tracks.audio, preferredLanguage);
+    const subTracks   = findTracks('subtitle', this.tracks.subtitle, preferredLanguage);
+    const tracks      = {};
 
     //audio found
     if(audioTracks.length > 0){
-      this.best.audio = audioTracks[0];
+      tracks.audio = audioTracks[0];
       
       //if requested audio is found, and if we have subtitles we try to incrust forced subtitle  
       for(let i = 0, sz = subTracks.length; i < sz; i++){
         if(isSubtitleForced(subTracks[i])){
-          this.best.subtitle = subTracks[i];
+          tracks.subtitle = subTracks[i];
           break;
         }
       }
@@ -108,59 +120,52 @@ class Media {
     else if(subTracks.length > 0){ //audio with the needed language not found, we are going to incrust full subtitles
       for(let i = 0, sz = subTracks.length; i < sz; i++){
         if(!isSubtitleForced(subTracks[i])){
-          this.best.subtitle = subTracks[i];
+          tracks.subtitle = subTracks[i];
           break;
         }
       }
       
       //if full subtitles weren't found, fallback with forced one
-      if(!this.best.subtitle){
-        this.best.subtitle = subTracks[0];
+      if(!tracks.subtitle){
+        tracks.subtitle = subTracks[0];
       }
     }
     
     //if no audio selected, we use the first track
-    if(!this.best.audio){
-      this.best.audio = allAudioTracks[0];
+    if(!tracks.audio){
+      tracks.audio = this.tracks.audio[0];
     }
     
-    return this;
+    return tracks;
   }
 
   /**
    * Select video track
    * @return {Media}
    */
-  selectVideoTrack() {
-    const qualities = [];
-    const streams   = findTracks('video', this.metadata.streams);
-    
-    assert.ok(streams.length > 0, 'Cannot found any video track');
+  findVideoTrack() {
+    assert.ok(this.tracks.video.length > 0, 'Cannot found any video track');
     
     //select first video track by default
-    this.best.video = streams[0];
-
-    return this;
+    return this.tracks.video[0];
   }
 
   /**
-   * Select qualities presets for transco
+   * Configure presets for this media
    * @param {Array[Object]} presets
    * @param {Object} defaultPreset cf root directory => config.json : presets
    * @return {Media}
    */
-  selectPresets(presets, defaultPreset) {
-    assert.ok(!!this.best.video, 'selectVideoTrack must be called before selectPresets');
-    assert.ok(!!this.best.audio, 'selectAudioAndSubTrack must be called before selectPresets');
-    
-    const audio           = this.best.audio;
-    const video           = this.best.video;
+  configurePresets({ audioTrack, presets, defaultPreset } = { audioTrack: null }) {
+    const audio           = audioTrack || this.findBestAS(/.*/).audio;
+    const video           = this.findVideoTrack();
     const outputs         = [];
-    const audioTracks     = findTracks('audio', this.metadata.streams);
+    const audioTracks     = this.tracks.audio;
     
     const baseConf = {
       audio:    { tracks: audioTracks },
-      video:    { track: this.best.video }
+      video:    { track:  video },
+      subtitle: { tracks: this.tracks.subtitle }
     };
 
     presets.forEach((preset, i) => {
@@ -197,10 +202,26 @@ class Media {
       outputs.push(conf);
     }
     
-    this.outputs = outputs;
-    
-    return this;
+    return outputs;
   }
 }
 
-module.exports = Media;
+/**
+ * Create a new Media and hydrate it with metadata
+ * @param {String} inputFile
+ * @return {Promise}
+ */
+module.exports = function(file) {
+  return new Promise((resolve, reject) => {
+    FFmpeg.ffprobe(file, (err, metadata) => {
+      if(err){
+        return reject(err);
+      }
+      
+      const media = new Media({ file, metadata });        
+      resolve(new Media({ file, metadata }));
+    });
+  });  
+};
+
+module.exports.Media = Media;

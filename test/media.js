@@ -1,41 +1,56 @@
-const Media  = require('../src/media.js');
+const media  = require('../src/media.js');
+const Media  = media.Media;
 const assert = require('assert');
 const _      = require('lodash');
+const path   = require('path');
 
 describe('Media', () => {
   const enLanguage = /^(en|us).*/i;
   const frLanguage = /^fr.*/i;
   const ruLanguage = /^ru.*/i;
   const czLanguage = /^cz.*/i;
+  const mediaFile1 = path.join(__dirname, 'resources/bbb-625-10.mp4');
 
-  describe('#selectBestAV', () => {
+  describe('#create', () => {
+    it('Can\'t open media file', (done) => {
+      media('notfound')
+        .then(() => done(new Error('It should not found file')))
+        .catch((err) => done());
+    });
+
+    it('Can prepare media file', (done) => {
+      media(mediaFile1)
+        .then(() => done())
+        .catch((err) => done(err));
+    });
+  });
+
+  describe('#findBestAS', () => {
     const metadata = require('./resources/metadata-audio-subtitles.json');
 
     it('Should not be able to found an audio track', () => {
       const media = new Media({});
-      assert.throws(() => media.selectPresets(enLanguage));
+      assert.throws(() => media.findBestAS(enLanguage));
     }); 
 
     it('Should select our preferred audio track and forced subtitles', () => {
       const media           = new Media({ metadata });
       const audioNeeded     = metadata.streams[1];
       const subtitleNeeded  = metadata.streams[5];
-
-      media.selectBestAV(enLanguage);
-
-      assert.deepStrictEqual(media.best.audio, audioNeeded);
-      assert.deepStrictEqual(media.best.subtitle, subtitleNeeded);
+      const tracks          = media.findBestAS(enLanguage);
+      
+      assert.deepStrictEqual(tracks.audio, audioNeeded);
+      assert.deepStrictEqual(tracks.subtitle, subtitleNeeded);
     });
 
     it('Should select first audio track and preferred subtitles', () => {
       const media           = new Media({ metadata });
       const audioNeeded     = metadata.streams[0];
       const subtitleNeeded  = metadata.streams[8];
+      const tracks          = media.findBestAS(ruLanguage);
 
-      media.selectBestAV(ruLanguage);
-
-      assert.deepStrictEqual(media.best.audio, audioNeeded);
-      assert.deepStrictEqual(media.best.subtitle, subtitleNeeded);
+      assert.deepStrictEqual(tracks.audio, audioNeeded);
+      assert.deepStrictEqual(tracks.subtitle, subtitleNeeded);
     });
 
     it('Should select first audio track and fallback to forced subtitles', () => {
@@ -44,59 +59,73 @@ describe('Media', () => {
       const media           = new Media({ metadata: metadataCpy });
       const audioNeeded     = metadataCpy.streams[0];
       const subtitleNeeded  = metadataCpy.streams[7];
-      
-      media.selectBestAV(ruLanguage);
+      const tracks          = media.findBestAS(ruLanguage);
 
-      assert.deepStrictEqual(media.best.audio, audioNeeded);
-      assert.deepStrictEqual(media.best.subtitle, subtitleNeeded);
+      assert.deepStrictEqual(tracks.audio, audioNeeded);
+      assert.deepStrictEqual(tracks.subtitle, subtitleNeeded);
     });
 
     it('No preferred subtitle & audio tracks, fallback to first audio track', () => {
       const media           = new Media({ metadata });
       const audioNeeded     = metadata.streams[0];
+      const tracks          = media.findBestAS(czLanguage);
 
-      media.selectBestAV(czLanguage);
-
-      assert.deepStrictEqual(media.best.audio, audioNeeded);
+      assert.deepStrictEqual(tracks.audio, audioNeeded);
     });
+  });
 
-    it('Should have all subtitles in subtitles field', () => {
-      const media           = new Media({ metadata });
+  describe('#metadata setter', () => {
+    const asMetadata = require('./resources/metadata-audio-subtitles.json');
+    const vMetadata  = require('./resources/metadata-video-low.json');
+
+    it('Should have subtitles and audio', () => {
+      const media           = new Media({ metadata: asMetadata });
       const subtitlesNeeded = [ 
-        metadata.streams[3], 
-        metadata.streams[4], 
-        metadata.streams[5],
-        metadata.streams[6],
-        metadata.streams[7],
-        metadata.streams[8]
+        asMetadata.streams[3], 
+        asMetadata.streams[4], 
+        asMetadata.streams[5],
+        asMetadata.streams[6],
+        asMetadata.streams[7],
+        asMetadata.streams[8]
+      ];
+      const audioNeeded = [ 
+        asMetadata.streams[0], 
+        asMetadata.streams[1], 
+        asMetadata.streams[2],
       ];
 
-      media.selectBestAV(czLanguage);
+      assert.deepStrictEqual(media.tracks.subtitle, subtitlesNeeded);
+      assert.deepStrictEqual(media.tracks.audio, audioNeeded);
+    });
 
-      assert.deepStrictEqual(media.subtitles, subtitlesNeeded);
+    it('Should have video and audio track', () => {
+      const media           = new Media({ metadata: vMetadata });
+      const videoNeeded     = [ vMetadata.streams[0] ];
+      const audioNeeded     = [ vMetadata.streams[1] ];
+      assert.deepStrictEqual(media.tracks.video, videoNeeded);
+      assert.deepStrictEqual(media.tracks.audio, audioNeeded);
     });
   });
 
 
-  describe('#selectVideoTrack', () => {
+  describe('#findVideoTrack', () => {
     const metadata = require('./resources/metadata-video-low.json');
 
     it('Should not be able to found a video track', () => {
       const media = new Media({});
-      assert.throws(() => media.selectVideoTrack());
+      assert.throws(() => media.findVideoTrack());
     }); 
 
     it('Should select first video track', () => {
       const media       = new Media({ metadata });
       const videoNeeded = metadata.streams[0];
+      const videoTrack  = media.findVideoTrack();
       
-      media.selectVideoTrack();
-      
-      assert.deepStrictEqual(media.best.video, videoNeeded);
+      assert.deepStrictEqual(videoTrack, videoNeeded);
     }); 
   });
 
-  describe('#selectPresets', () => {
+  describe('#configurePresets', () => {
     const presets       = require('./resources/presets-video.json');
     const defaultPreset = presets.reduce((prec, cur) => {
       if (prec && prec.default) {
@@ -107,9 +136,12 @@ describe('Media', () => {
     });
 
     function selectAll(media, presets, defaultPreset) {
-      media.selectBestAV(enLanguage)
-           .selectVideoTrack()
-           .selectPresets(presets, defaultPreset);
+      const asTracks = media.findBestAS(enLanguage);
+      return media.configurePresets({ 
+        audioTracl: asTracks.audio, 
+        presets, 
+        defaultPreset
+      });
     }
 
     function cleanResult(result) {
@@ -118,21 +150,15 @@ describe('Media', () => {
       return result;
     }
 
-    it('Should not be callable before selectVideoTrack and selectAudioAndSubTrack', () => {
-      const media = new Media({});
-      assert.throws(() => media.selectPresets());
-    }); 
-
     it('Should fallback to default preset and preserve av bitrate and size', () => {
       const metadata = require('./resources/metadata-video-low.json');
       const media    = new Media({ metadata });
+      const presets  = selectAll(media, [], defaultPreset);
 
-      selectAll(media, [], defaultPreset);
-
-      assert.strictEqual(media.outputs.length, 1, 'It should not have more than one quality selected');
+      assert.strictEqual(presets.length, 1, 'It should not have more than one quality selected');
       
       assert.deepStrictEqual(
-        cleanResult(media.outputs[0]), 
+        cleanResult(presets[0]), 
         _.merge({}, defaultPreset, {
           video: {
             width:   metadata.streams[0].width,
@@ -150,13 +176,12 @@ describe('Media', () => {
       const metadata       = require('./resources/metadata-video-480.json');
       const media          = new Media({ metadata });
       const expectedPreset = presets[0];
-      
-      selectAll(media, presets, defaultPreset);
+      const returnPresets  = selectAll(media, presets, defaultPreset);
 
-      assert.strictEqual(media.outputs.length, 1, 'It should not have more than one quality selected');
+      assert.strictEqual(returnPresets.length, 1, 'It should not have more than one quality selected');
       
       assert.deepStrictEqual(
-        cleanResult(media.outputs[0]), 
+        cleanResult(returnPresets[0]), 
         _.merge({}, expectedPreset, {
           video: {
             width: 640,
