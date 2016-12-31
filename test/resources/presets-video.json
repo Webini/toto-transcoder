@@ -3,55 +3,50 @@
         "default": true,
         "name": "480p",
         "video": {
-            "codec": "libx264",
             "bitrate": 516096,
             "maxbitrate": 516096,
             "width": 720,
             "height": 480
         },
         "audio": {
-            "codec": "libfaac",
             "bitrate": 98304,
             "channels": 2
-        },
-        "preset": "slow",
-        "format": "mp4",
-        "extension": "mp4"
+        }
     },
     {
         "name": "720p",
         "video": {
-            "codec": "libx264",
             "bitrate": 890880,
             "maxbitrate": 890880,
             "width": 1280,
             "height": 720
         },
         "audio": {
-            "codec": "libfaac",
             "bitrate": 131072,
             "channels": 2
-        },
-        "preset": "slow",
-        "format": "mp4",
-        "extension": "mp4"
+        }
     },
     {
         "name": "1080p",
         "video": {
-            "codec": "libx264",
             "bitrate": 1884160,
             "maxbitrate": 1884160,
             "width": 1920, 
             "height": 1080
         },
         "audio": {
-            "codec": "libfaac",
             "bitrate": 163840,
             "channels": 2
+        }
+    },
+    {
+        "name": "sub",
+        "subtitle": {
+            "a": "a",
+            "b": "b"
         },
-        "preset": "slow",
-        "format": "mp4",
-        "extension": "mp4"
+        "thumbnails": {
+            "a": "a"
+        }
     }
 ]

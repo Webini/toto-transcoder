@@ -144,8 +144,9 @@ class Media {
    * @return {Media}
    */
   findVideoTrack() {
-    assert.ok(this.tracks.video.length > 0, 'Cannot found any video track');
-    
+    if (this.tracks.video.length <= 0) {
+      return null;
+    }
     //select first video track by default
     return this.tracks.video[0];
   }
@@ -159,32 +160,53 @@ class Media {
   configurePresets({ audioTrack, presets, defaultPreset } = { audioTrack: null }) {
     const audio           = audioTrack || this.findBestAS(/.*/).audio;
     const video           = this.findVideoTrack();
+    const subtitle        = this.tracks.subtitle;
     const outputs         = [];
     const audioTracks     = this.tracks.audio;
-    
-    const baseConf = {
-      audio:    { tracks: audioTracks },
-      video:    { track:  video },
-      subtitle: { tracks: this.tracks.subtitle }
-    };
+
+    function generateConf(preset) {
+      const baseConf = {};
+      if (preset.audio) {
+        baseConf.audio = { tracks: audioTracks };
+      }
+
+      if (preset.video) {
+        baseConf.video = { track: video };
+      }
+
+      if (preset.subtitle) {
+        baseConf.subtitle = { tracks: subtitle }
+      }
+
+      if (preset.thumbnails && video) {
+        baseConf.thumbnails = { track: video };
+      }
+
+      return _.merge({}, preset, baseConf);
+    }
 
     presets.forEach((preset, i) => {
-      const conf = _.merge({}, preset, baseConf);
+      const conf = generateConf(preset);
       
-      if(video.height >= conf.video.height){
-        conf.video.width = Math.round(video.width / video.height * conf.video.height); //auto width
-        conf.video.width += conf.video.width % 2; //must be divisible by 2
-      }
-      else if(video.width >= conf.video.width){
-        conf.video.height = Math.round(video.height / video.width * conf.video.width); //auto height
-        conf.video.height += conf.video.height % 2; //must be divisible by 2
-      }
-      else {
-        return;
+      if (conf.video) {
+        if(video.height >= conf.video.height){
+          conf.video.width = Math.round(video.width / video.height * conf.video.height); //auto width
+          conf.video.width += conf.video.width % 2; //must be divisible by 2
+        }
+        else if(video.width >= conf.video.width){
+          conf.video.height = Math.round(video.height / video.width * conf.video.width); //auto height
+          conf.video.height += conf.video.height % 2; //must be divisible by 2
+        }
+        else {
+          return;
+        }
+      
+        conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
       }
 
-      conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
-      conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
+      if (conf.audio) {
+        conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
+      }
 
       outputs.push(conf);
     });
@@ -192,12 +214,17 @@ class Media {
     
     //if no presets are found we'll use the default preset with options adapted to the current media
     if(outputs.length <= 0){
-      const conf = _.merge({}, defaultPreset, baseConf);
+      const conf =  generateConf(defaultPreset);
       
-      conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
-      conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
-      conf.video.width   = video.width;
-      conf.video.height  = video.height;
+      if (conf.video) {
+        conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
+        conf.video.width   = video.width;
+        conf.video.height  = video.height;
+      }
+
+      if (conf.audio) {
+        conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
+      }
 
       outputs.push(conf);
     }

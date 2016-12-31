@@ -113,7 +113,7 @@ describe('Media', () => {
 
     it('Should not be able to found a video track', () => {
       const media = new Media({});
-      assert.throws(() => media.findVideoTrack());
+      assert.ok(media.findVideoTrack() === null, 'Should not found video track');
     }); 
 
     it('Should select first video track', () => {
@@ -145,8 +145,10 @@ describe('Media', () => {
     }
 
     function cleanResult(result) {
-      delete result.audio.tracks;
-      delete result.video.track;
+      if (result.audio) { delete result.audio.tracks; }
+      if (result.video) { delete result.video.track; }
+      if (result.subtitle) { delete result.subtitle.tracks; }
+      if (result.thumbnails) { delete result.thumbnails.track; }
       return result;
     }
 
@@ -175,14 +177,13 @@ describe('Media', () => {
     it('Should select first preset, arrange width and use original audio bitrate', () => {
       const metadata       = require('./resources/metadata-video-480.json');
       const media          = new Media({ metadata });
-      const expectedPreset = presets[0];
       const returnPresets  = selectAll(media, presets, defaultPreset);
 
-      assert.strictEqual(returnPresets.length, 1, 'It should not have more than one quality selected');
+      assert.strictEqual(returnPresets.length, 2, 'It should not have more than 2 presets selected');
       
       assert.deepStrictEqual(
         cleanResult(returnPresets[0]), 
-        _.merge({}, expectedPreset, {
+        _.merge({}, presets[0], {
           video: {
             width: 640,
           },
@@ -190,6 +191,11 @@ describe('Media', () => {
             bitrate: metadata.streams[1].bit_rate,
           }
         })
+      );
+
+      assert.deepStrictEqual(
+        cleanResult(returnPresets[1]),
+        presets[3]
       );
     });
   });

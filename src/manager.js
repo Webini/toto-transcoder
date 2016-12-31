@@ -42,7 +42,6 @@ class Manager {
    * We have to add a notification queue for transcoding progress
    * the manager must not handle transcoder configuration or maybe remove
    * it, focus only on transcoder, and let the devs play as they want
-   * Then we can implement our microservice with Media and Transcoder
    * KISS
    */
   transcode(media) {

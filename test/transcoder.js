@@ -4,152 +4,93 @@ const path       = require('path');
 const fs         = require('fs');
 
 describe('Transcoder', () => {
-  const outputDir  = path.join(__dirname, 'tmp');
-  const filePrefix = 'test%';
-  const mediaFile1 = path.join(__dirname, 'resources/bbb-625-10.mp4');
-  const presets    = require('./resources/presets-video.json');
-  const thumbnails = {
-    delay: "1",
-    width: 120,
-    cols: 3
-  };
-  const subtitles = {
-    codec: "webvtt",
-    extension: "vtt"
-  };
-  const transco    = new Transcoder({ presets, thumbnails, subtitles });
+  const globalConf = require('./resources/manager.json');
+  const cpuConf = globalConf.transcoders.cpu;
+  const gpuConf = globalConf.transcoders.nvidia;
+  const gpuTransco = new Transcoder({ conf: gpuConf });
+  const cpuTransco = new Transcoder({ conf: cpuConf });
 
-  describe('#transcode', () => {
-    it('Can immediatly kill a transcoding instance', function(done) {
-      this.timeout(60000);
-  
-      transco
-        .prepare(mediaFile1)
-        .then((media) => {
-          const transcoPromise = transco.transcode(media, outputDir, filePrefix);
-
-          transcoPromise.kill();
-          return transcoPromise;
-        })
-        .then((data) => {
-          done(new Error('Transcoding finished'));
-        })
-        .catch((err) => done());
+  describe('#getEncoder', () => {
+    it('Should return encoder name', () => {
+      assert.strictEqual(cpuTransco.getEncoder('h264'), 'libx264');
     });
 
-    it('Can kill a transcoding instance after run', function(done) {
-      this.timeout(60000);
-  
-      transco
-        .prepare(mediaFile1)
-        .then((media) => {
-          const transcoPromise = transco.transcode(media, outputDir, filePrefix);
+    it('Should return undefined', () => {
+      assert.strictEqual(cpuTransco.getEncoder('hevc'), undefined);
+    });
+  });
 
-          setTimeout(() => {
-            transcoPromise.kill();
-          }, 200);
+  describe('#canEncode', () => {
+    it('Should be ok', () => {
+      assert.strictEqual(cpuTransco.canEncode('h264'), true);
+    }); 
+    it('Should not be ok', () => {
+      assert.strictEqual(cpuTransco.canEncode('unexistant'), false);
+    }); 
+  });
 
-          return transcoPromise;
-        })
-        .then((data) => {
-          done(new Error('Transcoding finished'));
-        })
-        .catch((err) => done());
+  describe('#getDecoder', () => {
+    it('Should return decoder name', () => {
+      assert.strictEqual(gpuTransco.getDecoder('h264'), 'h264_cuvid');
     });
 
-    it('Can make basic transcoding with progression', function(done) {
-      this.timeout(60000);
-      let progressSeen = false;
-      let expectedFilePrefix = filePrefix;
+    it('Should return undefined', () => {
+      assert.strictEqual(gpuTransco.getDecoder('unexistant'), undefined);
+    });
 
-      const expectedResult = {
-        transcoded: {
-          '480p': {
-            duration: 9.466667,
-            resolution: { width: 854, height: 480 }
-          },
-          '720p': {
-            duration: 9.466667,
-            resolution: { width: 1280, height: 720 }
-          },
-          '1080p': {
-            duration: 9.466667,
-            resolution: { width: 1920, height: 1080 }
-          }
-        },
-        thumbnails: {
-          file: path.join(outputDir, `${expectedFilePrefix}.thumbs.jpg`),
-          meta: {
-            cols: thumbnails.cols,
-            delay: thumbnails.delay,
-            quantity: 12,
-            size: {
-              height: 68,
-              width: thumbnails.width
-            }
-          },
-          size: 36633
-        },
-        subtitles: [
-          {
-            default: false,
-            file: path.join(outputDir, `${expectedFilePrefix}.0.vtt`),
-            forced: false,
-            label: "No Name",
-            lang: null,
-            lang_639_1: null,
-            lang_639_2: null,
-            size: 328
-          },
-          {
-            default: false,
-            file: path.join(outputDir, `${expectedFilePrefix}.1.vtt`),
-            forced: false,
-            label: "No Name",
-            lang: null,
-            lang_639_1: null,
-            lang_639_2: null,
-            size: 368
-          }
-        ]
-      };
+    it('Should return null', () => {
+      assert.strictEqual(cpuTransco.getDecoder('h264'), null);
+    });
+  });
 
-      presets.forEach((preset) => {
-        expectedResult.transcoded[preset.name].file = path.join(outputDir, `${expectedFilePrefix}.${preset.name}.${preset.format}`);
-      });
-    
-      after(() => {
-        for (var key in expectedResult.transcoded) {
-          fs.unlinkSync(expectedResult.transcoded[key].file);
-        }
+  describe('#canDecode', () => {
+    it('Should be ok', () => {
+      assert.strictEqual(cpuTransco.canDecode('unexistant'), true);
+    }); 
 
-        expectedResult.subtitles.forEach((subtitle) => {
-          fs.unlinkSync(subtitle.file);
-        });
-        
-        fs.unlinkSync(expectedResult.thumbnails.file);
-      });
+    it('Should be ok with decoder defined', () => {
+      assert.strictEqual(gpuTransco.canDecode('h264'), true);
+    }); 
 
-      transco
-        .prepare(mediaFile1)
-        .then((media) => {
-          return transco.transcode(media, outputDir, filePrefix, (progress) => {
-            progressSeen = true;
-          });
-        })
-        .then((result) => {
-          if (!progressSeen) {
-            throw new Error('Progression error');
-          } else {
-            presets.forEach((preset) => {
-              expectedResult.transcoded[preset.name].size = result.transcoded[preset.name].size;
-            });
+    it('Should not be ok', () => {
+      assert.strictEqual(gpuTransco.canDecode('unexistant'), false);
+    }); 
+  });
 
-            assert.deepStrictEqual(result, expectedResult);
-            done();
-          }
-        })
-        .catch((err) => done(err));
+  describe('#isCodecBlacklisted', () => {
+    it('Should be ok', () => {
+      assert.strictEqual(cpuTransco.isCodecBlacklisted('dvd_subtitle'), true);
+    }); 
+    it('Should not be ok', () => {
+      assert.strictEqual(cpuTransco.isCodecBlacklisted('unexistant'), false);
+    }); 
+  });
+
+  describe('#getFilter', () => {
+    it('Should find filter', () => {
+      assert.strictEqual(cpuTransco.getFilter('unexistant'), 'unexistant');
+    });
+
+    it('Should not find filter', () => {
+      assert.strictEqual(gpuTransco.getFilter('unexistant'), undefined);
+    });
+
+    it('Should find new filter name', () => {
+      assert.strictEqual(gpuTransco.getFilter('scale'), 'scale_npp');
+    });
+  });
+
+  describe('#canFilter', () => {
+    it('Should be ok', () => {
+      assert.strictEqual(cpuTransco.canFilter('unexistant'), true);
+    })
+
+    it('Should not be ok', () => {
+      assert.strictEqual(gpuTransco.canFilter('unexistant'), false);
+    });
+
+    it('Should be ok with new filter name', () => {
+      assert.strictEqual(gpuTransco.canFilter('scale'), true);
     });
   });
 });
