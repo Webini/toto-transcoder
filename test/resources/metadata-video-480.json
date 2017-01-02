@@ -3,6 +3,7 @@
 		{
 			"index": 0,
 			"codec_type": "video",
+			"codec_name": "h264",
 			"width": 800,
 			"height": 601,
 			"bit_rate": 600000
@@ -10,6 +11,7 @@
 		{
 			"index": 1,
 			"codec_type": "audio",
+			"codec_name": "ac3",
 			"bit_rate": 96000,
 			"tags": {
 				"creation_time": "2013-12-16 17:44:42",

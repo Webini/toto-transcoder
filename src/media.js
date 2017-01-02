@@ -204,6 +204,7 @@ class Media {
         conf.video.bitrate = getOriginalOrDefaultBitrate(video.bit_rate, conf.video.bitrate);
       }
 
+      /** Put this in transcoder not here, we have more than 1 audio track now */
       if (conf.audio) {
         conf.audio.bitrate = getOriginalOrDefaultBitrate(audio.bit_rate, conf.audio.bitrate);
       }

@@ -25,16 +25,18 @@
                 "webvtt": "webvtt"
             },
             "decoders": {
-                "h263": "h263_cuvid",
-                "h264": "h264_cuvid",
-                "hevc": "hevc_cuvid",
-                "mjpeg": "mjpeg_cuvid",
-                "mpeg1video": "mpeg1_cuvid",
-                "mpeg2video": "mpeg2_cuvid",
-                "mpeg4": "mpeg4_cuvid",
-                "vc1": "vc1_cuvid",
-                "vp8": "vp8_cuvid",
-                "vp9": "vp9_cuvid"
+                "video": {
+                    "h263": "h263_cuvid",
+                    "h264": "h264_cuvid",
+                    "hevc": "hevc_cuvid",
+                    "mjpeg": "mjpeg_cuvid",
+                    "mpeg1video": "mpeg1_cuvid",
+                    "mpeg2video": "mpeg2_cuvid",
+                    "mpeg4": "mpeg4_cuvid",
+                    "vc1": "vc1_cuvid",
+                    "vp8": "vp8_cuvid",
+                    "vp9": "vp9_cuvid"
+                }
             },
             "hwDecoder": "cuvid",
             "codecBlacklist": [
@@ -111,7 +113,7 @@
             "name": "sub",
             "subtitle": {
                 "encoder": "webvtt",
-                "format": "vtt",
+                "format": "webvtt",
                 "extension": "vtt"
             },
             "thumbnails": {

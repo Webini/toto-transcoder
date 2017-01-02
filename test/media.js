@@ -138,7 +138,7 @@ describe('Media', () => {
     function selectAll(media, presets, defaultPreset) {
       const asTracks = media.findBestAS(enLanguage);
       return media.configurePresets({ 
-        audioTracl: asTracks.audio, 
+        audioTrack: asTracks.audio, 
         presets, 
         defaultPreset
       });
