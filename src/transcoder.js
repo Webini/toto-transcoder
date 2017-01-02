@@ -287,7 +287,8 @@ class Transcoder {
       options.push('-t 30'); 
     }
 
-    if (preset.video && preset.video.track) {
+    if (preset.video && preset.video.track && 
+         !this.isCodecBlacklisted(preset.video.track.codec_name)) {
       ffo.complexFilter([
         `[0:${preset.video.track.index}]` +
         this.getFilter(SCALE_FILTER) + 
@@ -331,7 +332,9 @@ class Transcoder {
 
     if (preset.audio) {
       preset.audio.tracks.forEach((track) => {
-        options.push(`-map 0:${track.index}`);
+        if (!this.isCodecBlacklisted(track.codec_name)) {
+          options.push(`-map 0:${track.index}`);
+        }
       });
 
       output.audioBitrate(toKb(preset.audio.bitrate))
@@ -343,7 +346,9 @@ class Transcoder {
       options.push(`-scodec ${this.getEncoder(preset.subtitle.encoder)}`);
 
       preset.subtitle.tracks.forEach((track) => {
-        options.push(`-map 0:${track.index}`);
+        if (!this.isCodecBlacklisted(track.codec_name)) {
+          options.push(`-map 0:${track.index}`);
+        }
       });
     }
 
@@ -369,8 +374,8 @@ class Transcoder {
 
           return videoData;
         })
-        //@todo add log infos, this should not happend
-        .catch((err) => true);
+        //@todo add log infos, this should never happend inshallah
+        .catch((err) => videoData);
     }
 
     return Promise.resolve(videoData);
@@ -383,35 +388,37 @@ class Transcoder {
     }
 
     return preset.subtitle.tracks.map((track) => {
-      const file    = path.join(outputDirectory, `${filePrefix}.${track.index}.${preset.subtitle.extension}`);
-      const output  = ffo.output(file);
-      const options = [];
+      if (!this.isCodecBlacklisted(track.codec_name)) {
+        const file    = path.join(outputDirectory, `${filePrefix}.${track.index}.${preset.subtitle.extension}`);
+        const output  = ffo.output(file);
+        const options = [];
 
-      if (this.conf.debug) { 
-        options.push('-t 30'); 
+        if (this.conf.debug) { 
+          options.push('-t 30'); 
+        }
+
+        options.push(
+          `-scodec ${this.getEncoder(preset.subtitle.encoder)}`,
+          `-map 0:${track.index}`,
+          `-an`,
+          `-vn`
+        );
+
+        output.outputOptions(options)
+              .format(preset.subtitle.format);
+
+        const code_639_2 = (track.tags && track.tags.language !== 'und' ? track.tags.language : null);
+        const language   = (code_639_2 ? map_639[code_639_2].label : null);
+        return {
+          label: (track.tags ? track.tags.title : null) || language || 'No Name',
+          lang_639_2: code_639_2,
+          lang_639_1: (code_639_2 ? map_639[code_639_2].code : null),
+          lang: language,
+          default: track.disposition.default ? true : false,
+          forced: track.disposition.forced ? true : false,
+          file: file
+        }; 
       }
-
-      options.push(
-        `-scodec ${this.getEncoder(preset.subtitle.encoder)}`,
-        `-map 0:${track.index}`,
-        `-an`,
-        `-vn`
-      );
-
-      output.outputOptions(options)
-            .format(preset.subtitle.format);
-
-      const code_639_2 = (track.tags && track.tags.language !== 'und' ? track.tags.language : null);
-      const language   = (code_639_2 ? map_639[code_639_2].label : null);
-      return {
-        label: (track.tags ? track.tags.title : null) || language || 'No Name',
-        lang_639_2: code_639_2,
-        lang_639_1: (code_639_2 ? map_639[code_639_2].code : null),
-        lang: language,
-        default: track.disposition.default ? true : false,
-        forced: track.disposition.forced ? true : false,
-        file: file
-      }; 
     });
   }
 
@@ -468,8 +475,6 @@ class Transcoder {
   }
 
   /**
-   * 
-   * 
    * @param {Object} thumbsConf
    * @param {Object} thumbData
    * @param {String} outputDirectory
