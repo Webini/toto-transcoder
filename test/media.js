@@ -127,20 +127,13 @@ describe('Media', () => {
 
   describe('#configurePresets', () => {
     const presets       = require('./resources/presets-video.json');
-    const defaultPreset = presets.reduce((prec, cur) => {
-      if (prec && prec.default) {
-        return prec;
-      }
+    const defaultPreset = presets.filter((preset) => preset.default)[0];
 
-      return (cur.default ? cur : null);
-    });
-
-    function selectAll(media, presets, defaultPreset) {
+    function selectAll(media, presets) {
       const asTracks = media.findBestAS(enLanguage);
       return media.configurePresets({ 
         audioTrack: asTracks.audio, 
-        presets, 
-        defaultPreset
+        presets
       });
     }
 
@@ -155,7 +148,7 @@ describe('Media', () => {
     it('Should fallback to default preset and preserve av bitrate and size', () => {
       const metadata = require('./resources/metadata-video-low.json');
       const media    = new Media({ metadata });
-      const presets  = selectAll(media, [], defaultPreset);
+      const presets  = selectAll(media, [ defaultPreset ]);
 
       assert.strictEqual(presets.length, 1, 'It should not have more than one quality selected');
       
@@ -177,7 +170,7 @@ describe('Media', () => {
     it('Should select first preset, arrange width and use original audio bitrate', () => {
       const metadata       = require('./resources/metadata-video-480.json');
       const media          = new Media({ metadata });
-      const returnPresets  = selectAll(media, presets, defaultPreset);
+      const returnPresets  = selectAll(media, presets);
 
       assert.strictEqual(returnPresets.length, 2, 'It should not have more than 2 presets selected');
       

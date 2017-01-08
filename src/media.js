@@ -154,15 +154,15 @@ class Media {
   /**
    * Configure presets for this media
    * @param {Array[Object]} presets
-   * @param {Object} defaultPreset cf root directory => config.json : presets
    * @return {Media}
    */
-  configurePresets({ audioTrack, presets, defaultPreset } = { audioTrack: null }) {
+  configurePresets({ audioTrack, presets } = { audioTrack: null }) {
     const audio           = audioTrack || this.findBestAS(/.*/).audio;
     const video           = this.findVideoTrack();
     const subtitle        = this.tracks.subtitle;
     const outputs         = [];
     const audioTracks     = this.tracks.audio;
+    const defaultPreset   = presets.filter((preset) => preset.default)[0];
 
     function generateConf(preset) {
       const baseConf = {};
